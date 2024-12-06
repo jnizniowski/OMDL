@@ -1,0 +1,22 @@
+# files
+dl-scraper/
+dl_scraper/
+archive/
+todo.md
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Output files
+*.xlsx
+*.csv
+logs/
+results/
+
+# my configs
+coffeedesk*
+iqos*
+ezebra*
+*.old
+configs/
