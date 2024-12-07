@@ -24,7 +24,7 @@ from googleapiclient.errors import HttpError
 PROJECT_NAME = "OMDL (Oh My DataLayer)"
 PROJECT_VERSION = "0.9"
 PROJECT_AUTHOR = "Jakub Niżniowski"
-PROJECT_URL = ""
+PROJECT_URL = "https://github.com/jnizniowski/OMDL"
 PROJECT_DESCRIPTION = "DataLayer events scraping tool"
 
 PROJECT_LICENSE = "MIT License"
