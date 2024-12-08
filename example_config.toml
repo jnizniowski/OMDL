@@ -20,7 +20,7 @@ title = "datalayer"                 # Base name for output files/sheets
 retries = 2                         # Number of times to retry failed actions
 default_timeout = 10                # How long to wait for elements to appear (in seconds)
 default_delay = 1                   # Default waiting time between steps (in seconds) - you can add extra delay in steps
-debug_mode = false                  # Adds debugging info to output file in a separate sheet - good for first runs
+debug_mode = true                   # Adds debugging info to output file in a separate sheet - good for first runs (default: false)
 
 # Browser behavior configuration (all optional)
 include_selenium_info = false       # Add Selenium info to user agent - set to true if you want to be explicitly identified as a bot
@@ -126,9 +126,10 @@ type = "click"                      # Required - step type
 clicks = [                          # List of elements to click in sequence (required at least one click)
     # Each click must have either xpath or selector (if both are available, XPath is used)
     # All clicks from the list will be executed at the given order
-    { xpath = '//*[@id="cookie-accept"]' },                    # Find element by XPath
-    { selector = "#button-add-to-cart" },                      # Find element by CSS selector
-    { selector = "#button-confirm", delay_after = 1 }          # you can specify delay after each click in seconds (if not, default_delay is applied)
+    { xpath = '//*[@id="cookie-accept"]' },            # Find element by XPath
+    { selector = "#button-add-to-cart" },              # Find element by CSS selector
+    { selector = "a" },                                # If more than one element matches the selector, it will be randomly picked
+    { selector = "#button-confirm", delay_after = 1 }  # you can specify delay after each click in seconds (if not, default_delay is applied)
 ]                                  
 
 [step.add_to_cart]
