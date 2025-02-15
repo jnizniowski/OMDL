@@ -137,22 +137,6 @@ class ExcelWriter:
             for cell in row:
                 cell.alignment = openpyxl.styles.Alignment(wrapText=True)
     
-    def _clean_data_entry(self, entry):
-        """Clean and format a single data entry"""
-        cleaned_entry = []
-        for i, item in enumerate(entry):
-            if isinstance(item, str):
-                if i == 4 and item.startswith('{'): # Event Data column
-                    try:
-                        parsed_json = json.loads(item)
-                        item = json.dumps(parsed_json, indent=2, ensure_ascii=False)
-                    except json.JSONDecodeError:
-                        pass
-                if len(item) > 32000:  # Safety measure for too long values (Excel doesn't like that)
-                    item = item[:32000] + "... (truncated)"
-            cleaned_entry.append(item)
-        return cleaned_entry
-    
     def _write_debug_logs(self, sheet, debug_logs):
         """If enabled, write debug logs to an additional sheet"""
         
@@ -922,7 +906,7 @@ def wait_for_element(browser, params, config, logger):
         # Quick filter exclude elements with 0 width/height
         candidates = [e for e in elements if has_dimensions(e)]
         total_matches = len(candidates)
-        logger.log(f"{len(elements)} out of {total_matches} matches qualified")
+        logger.log(f"{total_matches} out of {len(elements)} matches qualified")
         
         if total_matches > max_elements:
             warning_msg = f"Warning: Selector '{selector}' matches {total_matches} elements - consider using a more specific selector"
@@ -1223,14 +1207,15 @@ def perform_action(browser, action_type, params, config, logger):
         elif action_type == 'form':
             for field in params['fields']:
                 element = wait_for_element(browser, field, config, logger)
-                element.clear() # clear input before filling in
+                element.clear()  # clear input before filling in
                 element.send_keys(field['value'])
             submit_button = wait_for_element(browser, {'xpath': params['submit_button']}, config, logger)
             try:
                 submit_button.click()
             except Exception as e:
-                browser.execute_script("arguments[0].click();", element)
+                browser.execute_script("arguments[0].click();", submit_button)
             return "Form submitted successfully"
+
             
     except Exception as e:
         error_msg = clean_error_message(e)
@@ -1437,6 +1422,7 @@ def main():
             
             # Stop monitoring for this sequence
             stop_monitoring.set()
+            monitor_thread.join()
             
         # Save results
         output_path = save_results(config, logger, log_data, 
