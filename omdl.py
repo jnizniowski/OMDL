@@ -6,6 +6,9 @@ import sys
 import json
 import os
 import pickle
+import re
+
+from typing import Dict, Any, Tuple, List
 from pathlib import Path
 from queue import Queue
 from threading import Thread, Event
@@ -1263,6 +1266,57 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
             ])
 
     return log_data
+
+def validate_event(event: Dict[str, Any], rules: Dict[str, Any]) -> Tuple[bool, List[str]]:
+    """
+    Validates an event based on the provided rules.
+    """
+    errors = []
+    
+    type_checks = {
+        "int": lambda v: isinstance(v, int) and not isinstance(v, bool),
+        "float": lambda v: isinstance(v, (int, float)),
+        "str": lambda v: isinstance(v, str),
+    }
+
+    def check_structure(data: Dict[str, Any], rule: Dict[str, Any], path: str = ""):
+        for key, expected in rule.items():
+            required = key.startswith("!")
+            clean_key = key.lstrip("!")
+
+            if clean_key not in data:
+                if required:
+                    errors.append(f"Missing required field: {path}{clean_key}")
+                continue
+
+            value = data[clean_key]
+
+            if isinstance(expected, str):
+                # Validate basic types
+                if expected in type_checks and not type_checks[expected](value):
+                    errors.append(f"{path}{clean_key} should be a {expected}")
+                # Validate regex pattern
+                elif expected.startswith("/") and not re.match(expected.strip("/"), str(value)):
+                    errors.append(f"{path}{clean_key} does not match the pattern {expected}")
+
+            elif isinstance(expected, dict):
+                # Validate nested objects
+                if not isinstance(value, dict):
+                    errors.append(f"{path}{clean_key} should be an object")
+                else:
+                    check_structure(value, expected, path + clean_key + ".")
+
+            elif isinstance(expected, list) and expected:
+                # Validate lists with expected structure
+                if not isinstance(value, list):
+                    errors.append(f"{path}{clean_key} should be a list")
+                else:
+                    for i, item in enumerate(value):
+                        check_structure(item, expected[0], f"{path}{clean_key}[{i}].")
+
+    check_structure(event, rules)
+    
+    return (len(errors) == 0, errors)
 
 def get_output_folder(config, logger):
     """  Get and create output folder if it doesn't exist. """
