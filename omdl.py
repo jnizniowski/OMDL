@@ -1012,6 +1012,9 @@ def start_monitoring_thread(browser, monitored_events, event_queue, stop_event, 
     error_cooldown = 0
     last_valid_url = None
     
+    # Get validation rules from config
+    validation_rules = config.get('validation', {})
+
     # Get the initial URL from the first visit step in the first sequence
     initial_url = None
     try:
@@ -1047,26 +1050,37 @@ def start_monitoring_thread(browser, monitored_events, event_queue, stop_event, 
                 continue
                 
             for event in datalayer:
-                if not isinstance(event, dict):
-                    continue
-                    
-                if 'event' not in event:
+                if not isinstance(event, dict) or 'event' not in event:
                     continue
                     
                 try:
                     sanitized_event = sanitize_event_data(event)
                     event_id = f"{event['event']}_{hash(json.dumps(sanitized_event, sort_keys=True))}"
                     
-                    if (event_id not in processed_events and
-                        (monitored_events is None or event['event'] in monitored_events)):
-                        event_queue.put({
-                            'event_name': event['event'],
-                            'event_data': sanitized_event,
-                            'timestamp': datetime.now(),
-                            'url': url_to_log
-                        })
-                        processed_events.add(event_id)
-                        logger.log(f"Found new event: {event['event']}")
+                    if event_id in processed_events or (monitored_events and event['event'] not in monitored_events):
+                        continue
+
+                    if validation_rules:
+                        is_valid, errors = validate_event(sanitized_event, validation_rules)
+                    else:
+                        is_valid, errors = True, []
+
+                    # Add validation result to the event record
+                    event_queue.put({
+                        'event_name': event['event'],
+                        'event_data': sanitized_event,
+                        'timestamp': datetime.now(),
+                        'url': url_to_log,
+                        'valid': is_valid,
+                        'error_details': errors if not is_valid else None
+                    })
+                    
+                    processed_events.add(event_id)
+
+                    if is_valid:
+                        logger.log(f"Valid event: {event['event']}")
+                    else:
+                        logger.log(f"Invalid event: {event['event']} - Errors: {errors}", "ERROR")
                 except Exception as inner_e:
                     logger.log(f"Error processing event: {clean_error_message(inner_e)}", "ERROR")
                     
