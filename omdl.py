@@ -1106,7 +1106,9 @@ def process_queued_events(event_queue, log_data, current_step, logger, until_tim
                 event['event_name'],
                 event['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
                 event['url'],
-                json.dumps(event['event_data'], indent=2)  # Added indentation for better formatting
+                json.dumps(event['event_data'], indent=2) , # Added indentation for better formatting
+                "✔️" if event.get('valid', False) else "❌",
+                json.dumps(event.get('error_details', '-'), indent=2) if event.get('error_details') else "-"
             ])
         except Exception as e:
             logger.log(f"Error processing event from queue: {clean_error_message(e)}", "ERROR")
@@ -1276,7 +1278,9 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
                 'Error',
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 browser.current_url,
-                error_msg
+                error_msg,
+                "-",
+                "❌"
             ])
 
     return log_data
