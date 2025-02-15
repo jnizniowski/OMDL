@@ -110,7 +110,7 @@ class ExcelWriter:
         """Write sequence data to a sheet"""
         
         # Headers
-        headers = ["Step", "Event", "Timestamp", "URL", "Event Data"]
+        headers = ["Step", "Event", "Timestamp", "URL", "Event Data", "Valid", "Error Details"]
         sheet.append(headers)
         
         # Set column & row sizes
@@ -119,13 +119,17 @@ class ExcelWriter:
         sheet.column_dimensions['C'].width = 20  # Timestamp
         sheet.column_dimensions['D'].width = 50  # URL
         sheet.column_dimensions['E'].width = 100  # Event Data
+        sheet.column_dimensions['F'].width = 20  # Valid
+        sheet.column_dimensions['G'].width = 100  # Error Details
         
         sheet.sheet_format.defaultRowHeight = 20 # Default row height for all rows
         sheet.row_dimensions[1].height = 15 # Header row height
         
         # Write data
         for entry in data:
-            cleaned_entry = self._clean_data_entry(entry)
+            cleaned_entry = list(entry[:5])  # Add first 5 columns
+            cleaned_entry.append("✔️" if entry[5] else "❌")  # Validation
+            cleaned_entry.append(json.dumps(entry[6], indent=2) if entry[6] else "-")  # Errors
             sheet.append(cleaned_entry)
         
         # Apply text wrapping to Event Data column
@@ -415,8 +419,19 @@ class GoogleSheetsWriter:
         """Write sequence data to a sheet"""
         try:
             # Prepare headers and values
-            headers = ["Step", "Event", "Timestamp", "URL", "Event Data"]
-            values = [headers] + data
+            headers = ["Step", "Event", "Timestamp", "URL", "Event Data", "Valid", "Error Details"]
+            values = [headers] + [
+                [
+                    entry[0],  # Step
+                    entry[1],  # Event
+                    entry[2],  # Timestamp
+                    entry[3],  # URL
+                    json.dumps(entry[4], indent=2) if isinstance(entry[4], dict) else entry[4],  # Event Data
+                    "✔️" if entry[5] else "❌",  # Valid column
+                    json.dumps(entry[6], indent=2) if entry[6] else "-"  # Error Details
+                ]
+                for entry in data
+            ]
             
             # Create new sheet
             sheet_id = self._create_sheet(sequence_name)
