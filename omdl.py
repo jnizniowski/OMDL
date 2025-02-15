@@ -25,13 +25,13 @@ from googleapiclient.errors import HttpError
 
 ##### PROJECT INFO
 PROJECT_NAME = "OMDL (Oh My DataLayer)"
-PROJECT_VERSION = "0.9"
+PROJECT_VERSION = "1.0"
 PROJECT_AUTHOR = "Jakub Niżniowski"
 PROJECT_URL = "https://github.com/jnizniowski/OMDL"
-PROJECT_DESCRIPTION = "DataLayer events scraping tool"
+PROJECT_DESCRIPTION = "DataLayer events scraping & validation tool"
 
 PROJECT_LICENSE = "MIT License"
-PROJECT_COPYRIGHT = "Copyright (c) 2024 Jakub Niżniowski"
+PROJECT_COPYRIGHT = "Copyright (c) 2025 Jakub Niżniowski"
 
 PROJECT_HEADER = f"""
 {'='*60}

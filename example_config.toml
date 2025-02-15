@@ -10,6 +10,9 @@
 # - [step]     - At least one step definition
 # - [sequence] - At least one sequence definition
 
+# Optional sections:
+# - [validation] - DataLayer validation rules
+
 [config]
 
 # Optional configuration with default values.
@@ -85,7 +88,7 @@ token_location = "file"                  # Where to store/look for auth token
 
 # Option 2: Environment-based credentials (recommended for security reasons, but requires additional setup)
 # credentials_location = "env"          # Will look for GOOGLE_SHEETS_CREDENTIALS_PATH
-# token_location = "env"               # Will look for GOOGLE_SHEETS_TOKEN_PATH
+# token_location = "env"                # Will look for GOOGLE_SHEETS_TOKEN_PATH
 
 folder_id = "your_folder_id_here"       # Optional - Google Drive folder ID (if not specified, it'll save the file in the root direcory)
 
@@ -200,7 +203,73 @@ steps = [                           # Required - list of step names to execute
 
 [sequence.browse_products]          # You can create as many sequences as you like
 steps = [                           # All sequences will be performed and saved to separate sheets
-    "random_product_page",                 # You can use the same step multiple times
+    "random_product_page",          # You can use the same step multiple times
     "random_product_page",
     "random_product_page"
 ]
+
+# =============================================================================
+# Validation
+# Optional section for dataLayer validation.
+# Each validation must have a code block with a specific structure.
+# You can define multiple validations for different events, each with a unique name.
+# If you don't need validation, you can remove this section.
+# =============================================================================
+
+#### Syntax:
+# !key1: "value1",                # "!" means required
+# key2: "value2",                 # optional
+# key3: /Paris|London/,           # regex pattern (inside /.../) - must match
+# key4: {{type}},                 # data type (string, int, float)
+# "key5": "value5",               # quotes are optional but allowed
+#   "key6": "value6",             # indentation is also optional but allowed
+
+[validation]
+
+[validation.purchase]               # the name (here, "purchase") must match the event name from dataLayer
+code = '''
+  !event: "purchase",
+  !ecommerce: {
+    !transaction_id: /\w{5,10}/,
+    !value: {{float}},
+    tax: {{float}},
+    shipping: {{float}},
+    !currency: /USD|PLN|GBP/,
+    coupon: {{string}},
+    !items: [
+    {
+      !item_id: {{string}},
+      !item_name: {{string}},
+      affiliation: {{string}},
+      coupon: {{string}},
+      discount: {{float}},
+      index: {{int}},
+      !item_brand: {{string}},
+      !item_category: {{string}},
+      item_variant: {{string}},
+      !price: {{float}},
+      !quantity: {{int}}
+    }]
+  }
+'''
+
+[validation.add_to_cart]
+code = '''
+  !event: "add_to_cart",
+  !ecommerce: {
+    !currency: /USD|PLN|GBP/,
+    !value: {{float}},
+    coupon: {{string}},
+    !items: [
+    {
+      !item_id: {{string}},
+      !item_name: {{string}},
+      !item_brand: {{string}},
+      !item_category: {{string}},
+      item_variant: {{string}},
+      !price: {{float}},
+      !quantity: {{int}},
+      discount: {{float}}
+    }]
+  }
+'''

@@ -1,10 +1,10 @@
 # OMDL (Oh My dataLayer)
 
-**OMDL** is a script for automated collection of dataLayer events from websites. It simulates user journeys and record selected – or all – DL events to a spreadsheet with all necessary info.
+**OMDL** is a script for automated collection and validation of dataLayer events from websites. It simulates user journeys and recordS selected – or all – DL events to a spreadsheet with all necessary info.
 
 If you regularly go through a website to verify dataLayer events and their content, this script can save you a lot of time. Once configured, it'll do your job in a few minutes. You'll know what, when, and where was fired to the dataLayer.
 
-The most common scenario is **validation of the ecommerce funnel.** With OMDL, you can simulate almost every scenario from visiting a product to a purchase, including sign-in or filling a shipping info to a form.
+The most obvious scenario is **validation of the ecommerce funnel.** With OMDL, you can simulate almost every scenario from visiting a product page to a purchase, including sign-in or filling a shipping info to a form.
 
 It can also be configured to randomly examine pages from a list or click random elements (e.g. links) on a website.
 
@@ -12,18 +12,19 @@ OMDL stands for "Oh My dataLayer", but if you need a more official name for your
 
 Here's a sample of what the collected data looks like:
 
-| Step | Event | Timestamp | URL | Event Data |
-|------|--------|-----------|-----|------------|
-| my_step_name | view_item_list | 2024-12-08 10:15:25 | https://example-shop.com/shoes | { "event": "view_item_list", "item_list_name": "Shoes" [...] } |
+| Step | Event | Timestamp | URL | Event Data | Valid | Error Details |
+|------|--------|-----------|----|------------|-------|---------------|
+| my_step_name | purchase | 2024-12-08 10:15:25 | https://example-shop.com/thank-you | { "event": "purchase", "currency": "EUR" [...] } | ❌ | Missing required field: ecommerce.transaction_id |
 
 ## Features
 
 - 🤖 Browser interaction automation (page visits, clicks, form filling, scrolling)
-- 📊 Clean reports in a spreadsheet (Excel file or Google Sheets)
-- ✨ Easy setup in TOML files – no programming skills required
+- 📊 Clean reports in an Excel file or Google Sheets
+- ✨ Easy setup in TOML files
 - 🛠️ Highly configurable (see [Configuration](#Configuration)) yet not demanding
 - 🔄 Support for multiple sequences in one configuration
 - 🔍 Error handling with human-friendly messages
+- 🧩 Simple validation, following your schema
 - 🖥️ Cross-platform – built with Python
 
 ## Requirements
@@ -117,11 +118,11 @@ Usually that's enough. But sometimes crafting valid steps may be challenging, es
 
 ### XPath or CSS selectors?
 
-If you're from marketing or web analytics world, it's likely you at least have heard of CSS selectors. But XPath is not so common. But there are cases when XPath is more reliable than CSS. I'm not an expert, but I'll leave you with some rules of thumb.
+If you're from marketing or web analytics world, it's likely you at least have heard of CSS selectors. But there are cases when XPath is more reliable than CSS. I'm not an expert on that matter, but I'll leave you with some rules of thumb.
 
 1. If you know CSS selectors, use them as much as possible - they're easier to read.
 2. If you can rely on `id` attributes - both options are equally good.
-3. If you want to randomize the choice, use a CSS selector, but don't make it too broad. 
+3. If you want to randomize the choice (e.g. any link with class "button"), use a CSS selector, but don't make it too broad. 
 4. If you aim to click a specific element and its CSS is dynamically modified or useless to create selectors (no id, no classes) - use XPath.
 5. If in doubt, use XPath - they tend to be more reliable.
 
@@ -187,10 +188,6 @@ folder_id = "your_folder_id_here"
 
 **Solution**: Make sure Chrome is installed and up to date. On macOS, try running `xcode-select --install`.
 
-**Problem**: `PermissionError: [Errno 13] Permission denied: 'credentials.json'`
-
-**Solution**: Check file permissions and ownership of credential files
-
 **Problem**: `Error: Element not found or not clickable`
 
 **Solution**: 
@@ -208,7 +205,7 @@ If you find OMDL helpful, consider [buying me a coffee.](https://buycoffee.to/ni
 
 - For questions and discussions, please [open an issue](https://github.com/jnizniowski/OMDL/issues).
 - Contributions are welcome! Please feel free to submit a Pull Request.
-- I would appreciate sharing the project with your network or fellow analysts or developers, too.
+- Star the project and let others know about it ⭐
 
 ## License
 

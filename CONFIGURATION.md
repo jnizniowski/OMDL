@@ -4,8 +4,7 @@
 
 | Option | Description | Default Value |
 |--------|-------------|---------------|
-| `title` | Base name for output files/sheets | 
-“datalayer” |
+| `title` | Base name for output files/sheets | “datalayer” |
 | `retries` | Number of times to retry failed actions | 2 |
 | `default_timeout` | How long to wait for elements to appear (seconds) | 10 |
 | `default_delay` | Default waiting time between steps (seconds) | 1 |
@@ -88,3 +87,8 @@ Field definition options:
 | Parameter | Description | Required |
 |-----------|-------------|----------|
 | `steps` | Array of step names to execute in order | Yes |
+
+## Visit Steps
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `code` | A block of the syntaxed, JSON-ish declaration of expected parameters and values | Yes |
