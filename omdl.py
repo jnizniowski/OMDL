@@ -759,7 +759,9 @@ def load_config(config_path, logger):
         logger.log(f"Loading configuration from {config_path}")
         with open(config_path, 'r') as file:
             config = toml.load(file)
-
+        
+        config['validation'] = config.get('validation', {})
+        
         # track_events configuration (all if not specified)
         if 'config' in config:
             track_events = config['config'].get('track_events')
