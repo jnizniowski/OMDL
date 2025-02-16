@@ -29,7 +29,7 @@
 | Option | Description | Default Value |
 |--------|-------------|---------------|
 | `track_events` | List of dataLayer event names to track | null (track all events) |
-| `user_agents` | List of user agents to randomly select from | [Chrome 91 on Windows 10] |
+| `user_agents` | List of user agents to randomly select from | Chrome 91 on Windows 10 |
 
 ## Google Sheets Options
 

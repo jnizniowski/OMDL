@@ -14,7 +14,7 @@ Here's a sample of what the collected data looks like:
 
 | Step | Event | Timestamp | URL | Event Data | Valid | Error Details |
 |------|--------|-----------|----|------------|-------|---------------|
-| my_step_name | purchase | 2024-12-08 10:15:25 | https://example-shop.com/thank-you | { "event": "purchase", "currency": "EUR" [...] } | ❌ | Missing required field: ecommerce.transaction_id |
+| my_step_name | purchase | 2024-12-08 10:15:25 | https://example-shop.com/thank-you | { "event": "purchase", "currency": "EUR" (...) } | ❌ | Missing required field: ecommerce.transaction_id |
 
 ## Features
 
@@ -110,21 +110,27 @@ To save XPath or CSS selector, you need to use developer tools in your web brows
 Usually that's enough. But sometimes crafting valid steps may be challenging, especially for clicks and forms. These tips might help:
 
 - As mentioned before, use `debug_mode` and review its warnings and errors.
-- If you see that something (e.g. form or modal) is loading longer than a second, consider adding a delay for that step.
-- If a website utilizes lazy loading, you may want to scroll the page before clicking the element on the bottom part of the page.
-- If a checkbox in a form can't be marked as true with "form" step, try clicking it instead. Or its label.
-- Hide any floating elements (like modals, chatbots, etc.) that could overlay the page with `css_elements_to_hide` setting.
-- If you want to track a user journey, but you don't expect any DL pushes with a click, use "visit" steps - they're much easier to set up than clicks.
+- Define longer delays to wait for elements to load/appear.
+- You may need to scroll the page before clicking the element on the bottom part of the page (e.g. due to lazy loading).
+- If a checkbox can't be toggled with "form" step, try clicking it instead. Or its label.
+- Hide overlaying elements (like banners) with `css_elements_to_hide` setting.
+- In general, "visit" steps are easier to set up than clicks. If you don't expect any events fired with a click, you skip clicking links.
 
 ### XPath or CSS selectors?
 
-If you're from marketing or web analytics world, it's likely you at least have heard of CSS selectors. But there are cases when XPath is more reliable than CSS. I'm not an expert on that matter, but I'll leave you with some rules of thumb.
+If you work with web development or web analytics, it's likely you at least have heard of CSS selectors. But there are cases when XPath is more reliable than CSS. I'm not an expert on that matter, but I'll leave you with some rules of thumb.
 
-1. If you know CSS selectors, use them as much as possible - they're easier to read.
-2. If you can rely on `id` attributes - both options are equally good.
-3. If you want to randomize the choice (e.g. any link with class "button"), use a CSS selector, but don't make it too broad. 
-4. If you aim to click a specific element and its CSS is dynamically modified or useless to create selectors (no id, no classes) - use XPath.
-5. If in doubt, use XPath - they tend to be more reliable.
+1. CSS selectors are easier to read, use, and comprehend. They should be your first choice.
+2. But if they don't work, or you can't pinpoint the element with CSS selectors – use XPath.
+
+## Validation
+
+OMDL lets you run a simple validation for events and its parameters. To add a pattern, you can simply copy the event from dataLayer or from a documentation, and declare:
+
+- which parameters are obligatory,
+- what values (literals, regex, or value type) can be assigned.
+
+OMDL saves the detected issues in the output file.
 
 ## Google Sheets Integration
 
