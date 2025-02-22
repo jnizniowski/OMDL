@@ -66,6 +66,7 @@ Click definition options:
 | `type` | Must be "form" | Yes |
 | `fields` | Array of form field definitions | Yes |
 | `submit_button` | XPath of submit button | Yes |
+| `submit_method` | "selenium" for a default submit method, "js" and "action" as alternatives when "selenium" fails | No |
 | `delay_after` | Delay after step execution (seconds) | No |
 
 Field definition options:

@@ -113,6 +113,7 @@ Usually that's enough. But sometimes crafting valid steps may be challenging, es
 - Define longer delays to wait for elements to load/appear.
 - You may need to scroll the page before clicking the element on the bottom part of the page (e.g. due to lazy loading).
 - If a checkbox can't be toggled with "form" step, try clicking it instead. Or its label.
+- If submitting a form doesn't work, try another value of "submit_method".
 - Hide overlaying elements (like banners) with `css_elements_to_hide` setting.
 - In general, "visit" steps are easier to set up than clicks. If you don't expect any events fired with a click, you skip clicking links.
 
