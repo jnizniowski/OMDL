@@ -101,7 +101,7 @@ class ExcelWriter:
             
             # Save workbook
             self.workbook.save(self.output_path)
-            self.logger.log(f"Data successfully saved to Excel: {self.output_path}", "INFO")
+            # self.logger.log(f"Data successfully saved to Excel: {self.output_path}", "INFO")
             return str(self.output_path)
             
         except Exception as e:
@@ -130,10 +130,7 @@ class ExcelWriter:
         
         # Write data
         for entry in data:
-            cleaned_entry = list(entry[:5])  # Add first 5 columns
-            cleaned_entry.append("✔️" if entry[5] else "❌")  # Validation
-            cleaned_entry.append(json.dumps(entry[6], indent=2) if entry[6] else "-")  # Errors
-            sheet.append(cleaned_entry)
+            sheet.append(list(entry))
         
         # Apply text wrapping to Event Data column
         for row in sheet.iter_rows(min_row=2, min_col=5, max_col=5):
@@ -349,7 +346,7 @@ class GoogleSheetsWriter:
                 self._write_debug_logs(debug_logs)
             
             self.spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{self.spreadsheet_id}"
-            self.logger.log(f"Data successfully saved to Google Sheets: {self.spreadsheet_url}", "INFO")
+            #self.logger.log(f"Data successfully saved to Google Sheets: {self.spreadsheet_url}", "INFO")
             return self.spreadsheet_url
         
         except HttpError as e:
@@ -406,18 +403,7 @@ class GoogleSheetsWriter:
         try:
             # Prepare headers and values
             headers = ["Step", "Event", "Timestamp", "URL", "Event Data", "Valid", "Error Details"]
-            values = [headers] + [
-                [
-                    entry[0],  # Step
-                    entry[1],  # Event
-                    entry[2],  # Timestamp
-                    entry[3],  # URL
-                    json.dumps(entry[4], indent=2) if isinstance(entry[4], dict) else entry[4],  # Event Data
-                    "✔️" if entry[5] else "❌",  # Valid column
-                    json.dumps(entry[6], indent=2) if entry[6] else "-"  # Error Details
-                ]
-                for entry in data
-            ]
+            values = [headers] + data
             
             # Create new sheet
             sheet_id = self._create_sheet(sequence_name)
@@ -792,7 +778,8 @@ def initialize_browser(config, logger):
             user_agent += " Selenium"
             
         browser_options.add_argument(f'user-agent={user_agent}')
-        browser_options.add_argument("--silent")
+        browser_options.add_argument("--log-level=3") # Disable logging for webdriver
+        browser_options.add_experimental_option('excludeSwitches', ['enable-logging']) # Disable DevTools logs
         browser_options.add_argument("--disable-usb") # fixes some error logs; remove if you really need USB
         
         # Add request blocking if configured
@@ -1111,7 +1098,7 @@ def process_queued_events(event_queue, log_data, current_step, logger, until_tim
                 event['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
                 event['url'],
                 json.dumps(event['event_data'], indent=2) , # Added indentation for better formatting
-                "✔️" if event.get('valid', False) else "❌",
+                "✔️" if event.get('valid', False) else "❌" if event['event_name'] != "Error" else "-",
                 json.dumps(event.get('error_details', '-'), indent=2) if event.get('error_details') else "-"
             ])
         except Exception as e:
@@ -1135,8 +1122,8 @@ def perform_action(browser, action_type, params, config, logger):
             raise ValueError(f"Unsupported click_method: {method}")
     
     try:
-        current_url = browser.current_url
-        logger.log(f"➡️  Current URL: {current_url}", "INFO")
+        if action_type != 'visit':
+            logger.log(f"➡️  Current URL: {browser.current_url}", "INFO")
 
         if action_type == 'scroll':
             if 'selector' in params or 'xpath' in params:
@@ -1177,6 +1164,7 @@ def perform_action(browser, action_type, params, config, logger):
                     WebDriverWait(browser, config['config'].get('default_timeout', 10)).until(
                         lambda driver: driver.execute_script('return document.readyState') == 'complete'
                     )
+                    logger.log(f"➡️  Current URL: {browser.current_url}", "INFO")
                     logger.log("Page load completed")
                     inject_css(browser, config, logger)
                 except Exception as e:
@@ -1297,7 +1285,7 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
                 browser.current_url,
                 error_msg,
                 "-",
-                "❌"
+                "-"
             ])
 
     return log_data
