@@ -16,6 +16,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 from collections import deque
 from datetime import datetime
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -47,14 +48,16 @@ Documentation: {PROJECT_URL}
 
 class LogCollector:
     """Collect log messages with timestamps for debugging"""
-    def __init__(self):
+    def __init__(self, console_levels=("INFO", "WARNING", "ERROR")):
         self.logs = deque()  # deque seems to be better large logs
+        self.console_levels = console_levels
         
-    def log(self, message, level="INFO"):
+    def log(self, message, level="DEBUG"):
         """Add a log message, timestamp and level"""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.logs.append([timestamp, level, message])
-        print(message)
+        if level in self.console_levels:
+            print(message)
         
     def get_logs(self):
         """Return all logs"""
@@ -98,7 +101,7 @@ class ExcelWriter:
             
             # Save workbook
             self.workbook.save(self.output_path)
-            self.logger.log(f"Data successfully saved to Excel: {self.output_path}")
+            self.logger.log(f"Data successfully saved to Excel: {self.output_path}", "INFO")
             return str(self.output_path)
             
         except Exception as e:
@@ -259,7 +262,7 @@ class GoogleSheetsAuth:
                     self.logger.log("Refreshing Google Sheets access token...")
                     self.credentials.refresh(Request())
                 else:
-                    self.logger.log("Starting new Google Sheets authentication flow...")
+                    self.logger.log("Starting new Google Sheets authentication flow...", "INFO")
                     flow = InstalledAppFlow.from_client_secrets_file(
                         self.credentials_path,
                         self.SCOPES
@@ -336,7 +339,6 @@ class GoogleSheetsWriter:
                             spreadsheetId=self.spreadsheet_id,
                             body={'requests': [delete_request]}
                         ).execute()
-                        # self.logger.log("Removed a default sheet")
                     except Exception as e:
                         self.logger.log(f"Warning: Could not remove default Sheet1: {str(e)}", "WARNING")
                     
@@ -347,7 +349,7 @@ class GoogleSheetsWriter:
                 self._write_debug_logs(debug_logs)
             
             self.spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{self.spreadsheet_id}"
-            self.logger.log(f"Data successfully saved to Google Sheets: {self.spreadsheet_url}")
+            self.logger.log(f"Data successfully saved to Google Sheets: {self.spreadsheet_url}", "INFO")
             return self.spreadsheet_url
         
         except HttpError as e:
@@ -768,7 +770,7 @@ def load_config(config_path, logger):
         if 'config' in config:
             track_events = config['config'].get('track_events')
             if track_events is None or (isinstance(track_events, list) and not track_events):
-                logger.log("No track_events specified - will track all events")
+                logger.log("No track_events specified - will track all events", "INFO")
                 config['config']['track_events'] = None
 
         validate_sequence(config, logger)
@@ -790,6 +792,8 @@ def initialize_browser(config, logger):
             user_agent += " Selenium"
             
         browser_options.add_argument(f'user-agent={user_agent}')
+        browser_options.add_argument("--silent")
+        browser_options.add_argument("--disable-usb") # fixes some error logs; remove if you really need USB
         
         # Add request blocking if configured
         block_rules = []
@@ -926,12 +930,12 @@ def wait_for_element(browser, params, config, logger):
             # Detailed check for this element only
             if not is_element_clickable(element):
                 candidates.remove(element)
-                logger.log(f"Selected element not clickable, trying another ({len(candidates)} remaining)")
+                logger.log(f"🔎 Selected element not clickable, trying another ({len(candidates)} remaining)", "INFO")
                 continue
             
             # If element needs scrolling
             if not element.is_displayed():
-                logger.log("Selected element not in viewport, scrolling into view")
+                logger.log("🔎 Selected element not in viewport, scrolling into view", "INFO")
                 browser.execute_script("""
                     arguments[0].scrollIntoView({
                         block: 'center',
@@ -945,11 +949,11 @@ def wait_for_element(browser, params, config, logger):
                 WebDriverWait(browser, 3).until(  # Short timeout for final check
                     lambda driver: element.is_displayed() and element.is_enabled()
                 )
-                logger.log("Element is now visible and clickable")
+                logger.log("🎯 Element is now visible and clickable", "INFO")
                 return element
             except:
                 candidates.remove(element)
-                logger.log("Element is not clickable after scroll, trying another one")
+                logger.log("🔎 Element is not clickable after scroll, trying another one", "INFO")
                 continue
                 
         if total_matches > max_elements:
@@ -1077,9 +1081,9 @@ def start_monitoring_thread(browser, monitored_events, event_queue, stop_event, 
                     processed_events.add(event_id)
 
                     if is_valid:
-                        logger.log(f"Valid event: {event['event']}")
+                        logger.log(f"✅ Valid event: {event['event']}")
                     else:
-                        logger.log(f"Invalid event: {event['event']} - Errors: {errors}", "ERROR")
+                        logger.log(f"⚠️ Invalid event: {event['event']}", "ERROR")
                 except Exception as inner_e:
                     logger.log(f"Error processing event: {clean_error_message(inner_e)}", "ERROR")
                     
@@ -1115,22 +1119,37 @@ def process_queued_events(event_queue, log_data, current_step, logger, until_tim
 
 def perform_action(browser, action_type, params, config, logger):
     """Perform a single browser action - visit, click, form, scroll"""
+    
+    def do_click(element, browser, method="selenium"):
+        """Provide different methods of clicking an element."""
+        if method == "selenium":
+            try:
+                element.click()
+            except Exception:
+                browser.execute_script("arguments[0].click();", element)
+        elif method == "js":
+            browser.execute_script("arguments[0].click();", element)
+        elif method == "action":
+            ActionChains(browser).move_to_element(element).click().perform()
+        else:
+            raise ValueError(f"Unsupported click_method: {method}")
+    
     try:
         current_url = browser.current_url
-        logger.log(f"Current URL when performing action: {current_url}")
+        logger.log(f"➡️  Current URL: {current_url}", "INFO")
 
         if action_type == 'scroll':
             if 'selector' in params or 'xpath' in params:
                 element = wait_for_element(browser, params, config, logger)
-                logger.log(f"Scrolling to element")
+                logger.log(f"➡️ Scrolling to element", "INFO")
                 browser.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", element)
             elif 'pixels' in params:
                 scroll_amount = params['pixels']
-                logger.log(f"Scrolling by {scroll_amount} pixels")
+                logger.log(f"➡️ Scrolling by {scroll_amount} pixels", "INFO")
                 browser.execute_script(f"window.scrollBy(0, {scroll_amount});")
             elif 'percentage' in params:
                 scroll_percentage = params['percentage']
-                logger.log(f"Scrolling to {scroll_percentage}% of page")
+                logger.log(f"➡️ Scrolling to {scroll_percentage}% of page", "INFO")
                 browser.execute_script(f"""
                     let pageHeight = Math.max(
                         document.body.scrollHeight,
@@ -1186,7 +1205,7 @@ def perform_action(browser, action_type, params, config, logger):
                         browser.execute_script("arguments[0].click();", element)
                         
                     by_strategy, selector = get_element_locator(click_params, config)
-                    logger.log(f"Clicked element {i+1}: {selector}")
+                    logger.log(f"➡️  Clicked element {i+1}: {selector}" , "INFO")
                     success_count += 1
                     
                     # Handle delay between individual clicks
@@ -1207,15 +1226,13 @@ def perform_action(browser, action_type, params, config, logger):
                 return "All clicks completed successfully"
             
         elif action_type == 'form':
+            submit_method = params.get('submit_method', 'selenium')
             for field in params['fields']:
                 element = wait_for_element(browser, field, config, logger)
                 element.clear()  # clear input before filling in
                 element.send_keys(field['value'])
             submit_button = wait_for_element(browser, {'xpath': params['submit_button']}, config, logger)
-            try:
-                submit_button.click()
-            except Exception as e:
-                browser.execute_script("arguments[0].click();", submit_button)
+            do_click(submit_button, browser, submit_method) # click the submit button with the specified method
             return "Form submitted successfully"
 
             
@@ -1236,7 +1253,7 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
         step = steps_definitions[step_name]
         is_final_step = i == len(sequence['steps']) - 1
         
-        logger.log(f"\n=== Starting step: {step_name} ===")
+        logger.log(f"\n=== Starting step: {step_name} ===", "INFO")
         
         try:
             # Inject CSS before any action (in perform_action there is an additional injection for visit steps after page load)
@@ -1251,7 +1268,7 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
             
             # Handle delays based on step type and position
             if is_final_step:
-                logger.log(f"Final step - waiting {delay} seconds for events...")
+                logger.log(f"Final step - waiting {delay} seconds for events...", "INFO")
             else:
                 logger.log(f"Waiting {delay} seconds after {step['type']} step...")
                 
@@ -1268,7 +1285,7 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
             else:
                 process_queued_events(event_queue, log_data, step_name, logger, step_end_time)
 
-            logger.log(f"Step {step_name} completed successfully")
+            logger.log(f"🎉 Step {step_name} completed successfully", "INFO")
                 
         except Exception as e:
             error_msg = clean_error_message(e)
@@ -1362,7 +1379,7 @@ def get_output_folder(config, logger):
         logger.log(f"Error creating output folder: {clean_error_message(e)}", "ERROR")
         # Fall back to script directory
         folder_path = Path().absolute()
-        logger.log(f"Using fallback output folder: {folder_path}")
+        logger.log(f"Using fallback output folder: {folder_path}", "INFO")
     
     return folder_path
 
@@ -1386,11 +1403,11 @@ def main():
     print(PROJECT_HEADER)
 
     if len(sys.argv) < 2:
-        print("Usage: python script.py <config_path>")
+        print("Usage: python omdl.py <config_path>")
         sys.exit(1)
 
     config_path = sys.argv[1]
-    print(f"Starting script with configuration: {config_path}")
+    print(f"Starting OMDL with configuration: {config_path}")
     
     logger = LogCollector()
     config = load_config(config_path, logger)
@@ -1400,12 +1417,12 @@ def main():
     log_data = {}  # Dictionary to store data for each sequence
     
     try:
-        logger.log("Initializing script...")
+        logger.log("Initializing OMDL...", "INFO")
         browser = initialize_browser(config, logger)
         
         # Process each sequence
         for sequence_name, sequence in config['sequence'].items():
-            logger.log(f"=== Starting sequence: {sequence_name} ===")
+            logger.log(f"=== Starting sequence: {sequence_name} ===", "INFO")
             
             # Create thread communication objects for this sequence
             event_queue = Queue()
@@ -1431,7 +1448,7 @@ def main():
         # Save results
         output_path = save_results(config, logger, log_data, 
                                  logger.get_logs() if config['config'].get('debug_mode', False) else None)
-        logger.log(f"Results saved to: {output_path}")
+        logger.log(f"Results saved to: {output_path}", "INFO")
             
     except Exception as e:
         error_msg = clean_error_message(e)
@@ -1454,9 +1471,8 @@ def main():
             
     finally:
         if browser:
-            logger.log("Closing browser")
             browser.quit()
-        logger.log("Script completed 🎉")
+        logger.log("\n🎉🎉🎉 Done! 🎉🎉🎉", "INFO")
 
 # start
 if __name__ == "__main__":
