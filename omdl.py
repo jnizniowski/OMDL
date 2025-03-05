@@ -559,6 +559,206 @@ def clean_error_message(error):
         cleaned = f"Browser error occurred: {error.__class__.__name__}"
     return cleaned
 
+def parse_validation_from_toml(config):
+    """
+    Parse validation rules from TOML config.
+    Returns a dictionary of event_name -> validation_rules.
+    """
+    validation_rules = {}
+    
+    if 'validation' not in config:
+        return validation_rules
+        
+    for event_name, event_config in config['validation'].items():
+        if 'code' not in event_config:
+            continue
+            
+        code_str = event_config['code']
+        # Remove comments and clean up
+        code_lines = [line.split('#')[0].strip() for line in code_str.split('\n')]
+        code_str = ' '.join(code_lines)
+        
+        try:
+            rule_dict = parse_validation_code_block(code_str)
+            validation_rules[event_name] = rule_dict
+        except ValueError as e:
+            print(f"Error parsing validation rule for {event_name}: {str(e)}")
+    
+    return validation_rules
+
+def parse_validation_code_block(code_str):
+    """
+    A parser for validation blocks from TOML files.
+    Returns a dictionary structure.
+    """
+    # Remove whitespace and newlines
+    code_str = code_str.strip()
+    
+    def tokenize(s):
+        """
+        Tokenize string into: { } [ ] : , /regex/ {{type}} strings
+        or unquoted keys. Returns a list of tokens.
+        """
+        tokens = []
+        i = 0
+        while i < len(s):
+            c = s[i]
+
+            # Skip whitespace
+            if c.isspace():
+                i += 1
+                continue
+
+            # Single character tokens
+            if c in '{}[]:,':
+                tokens.append(c)
+                i += 1
+                continue
+
+            # Regex patterns
+            if c == '/':
+                j = s.find('/', i+1)
+                if j == -1:
+                    raise ValueError("Unclosed '/' in regex pattern")
+                regex_token = s[i:j+1]
+                tokens.append(regex_token)
+                i = j+1
+                continue
+
+            # Type specifiers
+            if s.startswith('{{', i):
+                j = s.find('}}', i+2)
+                if j == -1:
+                    raise ValueError("Unclosed '{{ }}' for type")
+                type_token = s[i:j+2]
+                tokens.append(type_token)
+                i = j+2
+                continue
+
+            # Quoted strings
+            if c in ["'", '"']:
+                quote_char = c
+                j = i+1
+                buff = []
+                # Handle escaped quotes
+                while j < len(s):
+                    if s[j] == '\\' and j+1 < len(s) and s[j+1] == quote_char:
+                        buff.append(quote_char)
+                        j += 2
+                        continue
+                    if s[j] == quote_char:
+                        break
+                    buff.append(s[j])
+                    j += 1
+                if j == len(s):
+                    raise ValueError(f"Unclosed {quote_char} quote")
+                string_val = "".join(buff)
+                tokens.append(string_val)
+                i = j+1  # skip closing quote
+                continue
+
+            # Read unquoted keys or values until special char or whitespace
+            special = set('{}[]:,"\'/ \t\n\r')
+            buff = []
+            while i < len(s) and s[i] not in special:
+                buff.append(s[i])
+                i += 1
+            tokens.append("".join(buff))
+
+        return tokens
+
+    # Functions to parse objects, lists, etc. using tokens
+    tokens = tokenize(code_str)
+    index = 0  # global pointer to token list
+
+    def peek():
+        return tokens[index] if index < len(tokens) else None
+
+    def consume(expected=None):
+        nonlocal index
+        if index >= len(tokens):
+            return None
+        t = tokens[index]
+        index += 1
+        if expected and t != expected:
+            raise ValueError(f"Expected '{expected}' but got '{t}'")
+        return t
+
+    def parse_value():
+        t = peek()
+        if t == '{':
+            return parse_object()
+        elif t == '[':
+            return parse_array()
+        elif t and t.startswith('/'):  # /regex/
+            consume()
+            return t  # return as is
+        elif t and t.startswith('{{'):  # {{type}}
+            consume()
+            return t  # return as is
+        else:
+            # treat anything else as string
+            return consume()
+
+    def parse_object():
+        obj = {}
+        consume('{')
+        first = True
+        while True:
+            t = peek()
+            if t == '}':
+                consume('}')
+                break
+            if not first and t == ',':
+                consume(',')
+            # key
+            key = parse_value()  
+            # Handle required field marker (!)
+            required = False
+            if key.startswith('!'):
+                required = True
+                key = key[1:]  # Remove the ! prefix
+            
+            # Handle quoted keys
+            if key.startswith('"') and key.endswith('"') or key.startswith("'") and key.endswith("'"):
+                key = key[1:-1]  # Remove quotes
+                
+            # colon
+            if peek() == ':':
+                consume(':')
+            # value
+            val = parse_value()
+            
+            # Store with metadata for required fields
+            if required:
+                obj[f"!{key}"] = val
+            else:
+                obj[key] = val
+            first = False
+        return obj
+
+    def parse_array():
+        arr = []
+        consume('[')
+        first = True
+        while True:
+            t = peek()
+            if t == ']':
+                consume(']')
+                break
+            if not first and t == ',':
+                consume(',')
+            val = parse_value()
+            arr.append(val)
+            first = False
+        return arr
+
+    # Start main parsing
+    if not tokens:
+        return {}
+    result = parse_object() if tokens[0] == '{' else parse_object()
+    return result
+
 def validate_sequence(config, logger):
     """
     Validate the entire sequence configuration with detailed checks.
@@ -585,7 +785,7 @@ def validate_sequence(config, logger):
     # if missing_config:
     #     raise ValueError(f"Missing required config fields: {', '.join(missing_config)}")
     
-# Validate output configuration
+    # Validate output configuration
     output_destination = config['config'].get('output_destination', 'excel')
     if output_destination not in ['excel', 'google_sheets']:
         logger.log(f"Warning: Invalid output_destination '{output_destination}' - must be 'excel' or 'google_sheets'. Using 'excel' as default.", "WARNING")
@@ -750,8 +950,8 @@ def load_config(config_path, logger):
         with open(config_path, 'r') as file:
             config = toml.load(file)
         
-        config['validation'] = config.get('validation', {})
-        
+        config['validation'] = parse_validation_from_toml(config)
+             
         # track_events configuration (all if not specified)
         if 'config' in config:
             track_events = config['config'].get('track_events')
@@ -1049,11 +1249,15 @@ def start_monitoring_thread(browser, monitored_events, event_queue, stop_event, 
                     
                     if event_id in processed_events or (monitored_events and event['event'] not in monitored_events):
                         continue
+                    
+                    is_valid = True
+                    errors = []
 
                     if validation_rules:
-                        is_valid, errors = validate_event(sanitized_event, validation_rules)
-                    else:
-                        is_valid, errors = True, []
+                        event_name = event['event']
+                        rule_for_event = validation_rules.get(event_name, {})
+                        if rule_for_event:
+                            is_valid, errors = validate_event(sanitized_event, rule_for_event)
 
                     # Add validation result to the event record
                     event_queue.put({
@@ -1321,6 +1525,10 @@ def validate_event(event: Dict[str, Any], rules: Dict[str, Any]) -> Tuple[bool, 
                 # Validate regex pattern
                 elif expected.startswith("/") and not re.match(expected.strip("/"), str(value)):
                     errors.append(f"{path}{clean_key} does not match the pattern {expected}")
+                else:
+                    # literal string
+                    if str(value) != expected:
+                        errors.append(f"{path}{clean_key} = {value} should be '{expected}'")
 
             elif isinstance(expected, dict):
                 # Validate nested objects
