@@ -574,6 +574,10 @@ def parse_validation_from_toml(config):
             continue
             
         code_str = event_config['code']
+        # Remove whitespace and newlines
+        code_str = code_str.strip()
+        if not (code_str.startswith('{') and code_str.endswith('}')):
+            code_str = "{" + code_str + "}"
         # Remove comments and clean up
         code_lines = [line.split('#')[0].strip() for line in code_str.split('\n')]
         code_str = ' '.join(code_lines)
@@ -591,8 +595,6 @@ def parse_validation_code_block(code_str):
     A parser for validation blocks from TOML files.
     Returns a dictionary structure.
     """
-    # Remove whitespace and newlines
-    code_str = code_str.strip()
     
     def tokenize(s):
         """
@@ -712,7 +714,9 @@ def parse_validation_code_block(code_str):
             if not first and t == ',':
                 consume(',')
             # key
-            key = parse_value()  
+            key = parse_value() 
+            if not isinstance(key, str):
+                raise ValueError("Klucz walidacji musi być ciągiem znaków, a otrzymano: " + str(key)) 
             # Handle required field marker (!)
             required = False
             if key.startswith('!'):
@@ -1250,7 +1254,9 @@ def start_monitoring_thread(browser, monitored_events, event_queue, stop_event, 
                     if event_id in processed_events or (monitored_events and event['event'] not in monitored_events):
                         continue
                     
-                    is_valid = True
+                    valid_flag = None
+                    error_details = None
+                    is_valid = None
                     errors = []
 
                     if validation_rules:
@@ -1258,6 +1264,14 @@ def start_monitoring_thread(browser, monitored_events, event_queue, stop_event, 
                         rule_for_event = validation_rules.get(event_name, {})
                         if rule_for_event:
                             is_valid, errors = validate_event(sanitized_event, rule_for_event)
+                            valid_flag = "✔️" if is_valid else "❌"
+                            error_details = errors if not is_valid else None
+                        else:
+                            valid_flag = "-"
+                            error_details = None
+                    else:
+                        valid_flag = "-"
+                        error_details = None
 
                     # Add validation result to the event record
                     event_queue.put({
@@ -1265,16 +1279,19 @@ def start_monitoring_thread(browser, monitored_events, event_queue, stop_event, 
                         'event_data': sanitized_event,
                         'timestamp': datetime.now(),
                         'url': url_to_log,
-                        'valid': is_valid,
-                        'error_details': errors if not is_valid else None
+                        'valid': valid_flag,
+                        'error_details': error_details
                     })
                     
                     processed_events.add(event_id)
 
-                    if is_valid:
+                    if is_valid is True:
                         logger.log(f"✅ Valid event: {event['event']}")
-                    else:
+                    elif is_valid is False:
                         logger.log(f"⚠️ Invalid event: {event['event']}", "ERROR")
+                    else:
+                        logger.log(f"🟦 Not validated (no rule): {event['event']}")
+
                 except Exception as inner_e:
                     logger.log(f"Error processing event: {clean_error_message(inner_e)}", "ERROR")
                     
@@ -1302,7 +1319,7 @@ def process_queued_events(event_queue, log_data, current_step, logger, until_tim
                 event['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
                 event['url'],
                 json.dumps(event['event_data'], indent=2) , # Added indentation for better formatting
-                "✔️" if event.get('valid', False) else "❌" if event['event_name'] != "Error" else "-",
+                event['valid'],
                 json.dumps(event.get('error_details', '-'), indent=2) if event.get('error_details') else "-"
             ])
         except Exception as e:
