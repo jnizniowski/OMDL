@@ -559,7 +559,7 @@ def clean_error_message(error):
         cleaned = f"Browser error occurred: {error.__class__.__name__}"
     return cleaned
 
-def parse_validation_from_toml(config):
+def parse_validation_from_toml(config, logger):
     """
     Parse validation rules from TOML config.
     Returns a dictionary of event_name -> validation_rules.
@@ -583,14 +583,14 @@ def parse_validation_from_toml(config):
         code_str = ' '.join(code_lines)
         
         try:
-            rule_dict = parse_validation_code_block(code_str)
+            rule_dict = parse_validation_code_block(code_str, logger)
             validation_rules[event_name] = rule_dict
         except ValueError as e:
             print(f"Error parsing validation rule for {event_name}: {str(e)}")
     
     return validation_rules
 
-def parse_validation_code_block(code_str):
+def parse_validation_code_block(code_str, logger):
     """
     A parser for validation blocks from TOML files.
     Returns a dictionary structure.
@@ -598,7 +598,7 @@ def parse_validation_code_block(code_str):
     
     def tokenize(s):
         """
-        Tokenize string into: { } [ ] : , /regex/ {{type}} strings
+        Tokenize string into: { } [ ] : , /regex/ <type> strings
         or unquoted keys. Returns a list of tokens.
         """
         tokens = []
@@ -628,10 +628,10 @@ def parse_validation_code_block(code_str):
                 continue
 
             # Type specifiers
-            if s.startswith('{{', i):
-                j = s.find('}}', i+2)
+            if s.startswith('<', i):
+                j = s.find('>', i+2)
                 if j == -1:
-                    raise ValueError("Unclosed '{{ }}' for type")
+                    raise ValueError("Unclosed '< >' for type")
                 type_token = s[i:j+2]
                 tokens.append(type_token)
                 i = j+2
@@ -689,20 +689,20 @@ def parse_validation_code_block(code_str):
     def parse_value():
         t = peek()
         if t == '{':
-            return parse_object()
+            return parse_object(logger)
         elif t == '[':
             return parse_array()
         elif t and t.startswith('/'):  # /regex/
             consume()
             return t  # return as is
-        elif t and t.startswith('{{'):  # {{type}}
+        elif t and t.startswith('<'):  # <type>
             consume()
             return t  # return as is
         else:
             # treat anything else as string
             return consume()
 
-    def parse_object():
+    def parse_object(logger):
         obj = {}
         consume('{')
         first = True
@@ -716,7 +716,7 @@ def parse_validation_code_block(code_str):
             # key
             key = parse_value() 
             if not isinstance(key, str):
-                raise ValueError("Klucz walidacji musi być ciągiem znaków, a otrzymano: " + str(key)) 
+                logger.log(f"⚠️  Validation key should be a string: {str(key)}.\nPlease review your configuration file.", "ERROR")
             # Handle required field marker (!)
             required = False
             if key.startswith('!'):
@@ -760,7 +760,7 @@ def parse_validation_code_block(code_str):
     # Start main parsing
     if not tokens:
         return {}
-    result = parse_object() if tokens[0] == '{' else parse_object()
+    result = parse_object(logger) if tokens[0] == '{' else parse_object(logger)
     return result
 
 def validate_sequence(config, logger):
@@ -954,7 +954,7 @@ def load_config(config_path, logger):
         with open(config_path, 'r') as file:
             config = toml.load(file)
         
-        config['validation'] = parse_validation_from_toml(config)
+        config['validation'] = parse_validation_from_toml(config, logger)
              
         # track_events configuration (all if not specified)
         if 'config' in config:
@@ -1288,7 +1288,7 @@ def start_monitoring_thread(browser, monitored_events, event_queue, stop_event, 
                     if is_valid is True:
                         logger.log(f"✅ Valid event: {event['event']}")
                     elif is_valid is False:
-                        logger.log(f"⚠️ Invalid event: {event['event']}", "ERROR")
+                        logger.log(f"⚠️  Invalid event: {event['event']}", "ERROR")
                     else:
                         logger.log(f"🟦 Not validated (no rule): {event['event']}")
 
