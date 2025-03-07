@@ -43,6 +43,7 @@ Documentation: {PROJECT_URL}
 {'='*60}
 """
 
+allowed_validation_types = {'<int>', '<float>', '<str>'}
 
 ##### CLASSES
 
@@ -595,7 +596,6 @@ def parse_validation_code_block(code_str, logger):
     A parser for validation blocks from TOML files.
     Returns a dictionary structure.
     """
-    
     def tokenize(s):
         """
         Tokenize string into: { } [ ] : , /regex/ <type> strings
@@ -618,54 +618,77 @@ def parse_validation_code_block(code_str, logger):
                 continue
 
             # Regex patterns
-            if c == '/':
+            if s.startswith('/', i):
                 j = s.find('/', i+1)
                 if j == -1:
                     raise ValueError("Unclosed '/' in regex pattern")
                 regex_token = s[i:j+1]
-                tokens.append(regex_token)
-                i = j+1
-                continue
+                try:
+                    re.compile(regex_token[1:-1])  # Validate it's a valid regex
+                    tokens.append(regex_token)
+                    i = j+1
+                    continue
+                except re.error:
+                    raise ValueError(f"Invalid regex pattern: {regex_token}")
 
             # Type specifiers
             if s.startswith('<', i):
-                j = s.find('>', i+2)
+                j = s.find('>', i+1)
                 if j == -1:
                     raise ValueError("Unclosed '< >' for type")
-                type_token = s[i:j+2]
+                type_token = s[i:j+1]
+                # Validate allowed type specifiers
+                if type_token.lower() not in allowed_validation_types:
+                    raise ValueError(f"Invalid type specifier '{type_token}'. Must be one of: {', '.join(allowed_validation_types)}")
                 tokens.append(type_token)
-                i = j+2
+                i = j+1
                 continue
 
             # Quoted strings
-            if c in ["'", '"']:
-                quote_char = c
-                j = i+1
+            if s.startswith('"', i) or s.startswith("'", i):
+                quote_char = s[i]
+                j = i + 1
                 buff = []
-                # Handle escaped quotes
+                escaped = False
+                
                 while j < len(s):
-                    if s[j] == '\\' and j+1 < len(s) and s[j+1] == quote_char:
-                        buff.append(quote_char)
-                        j += 2
+                    curr_char = s[j]
+                    
+                    if escaped:
+                        # Handle escaped character
+                        if curr_char == quote_char or curr_char == '\\':
+                            buff.append(curr_char)
+                        else:
+                            buff.append('\\' + curr_char)
+                        escaped = False
+                        j += 1
                         continue
-                    if s[j] == quote_char:
+                        
+                    if curr_char == '\\':
+                        escaped = True
+                        j += 1
+                        continue
+                        
+                    if curr_char == quote_char:
                         break
-                    buff.append(s[j])
+                        
+                    buff.append(curr_char)
                     j += 1
-                if j == len(s):
-                    raise ValueError(f"Unclosed {quote_char} quote")
-                string_val = "".join(buff)
-                tokens.append(string_val)
-                i = j+1  # skip closing quote
+                    
+                if j >= len(s) or s[j] != quote_char:
+                    raise ValueError(f"Unterminated string starting at position {i}")
+                    
+                tokens.append(''.join(buff))
+                i = j + 1
                 continue
 
-            # Read unquoted keys or values until special char or whitespace
+            # Unquoted keys/values 
             special = set('{}[]:,"\'/ \t\n\r')
             buff = []
             while i < len(s) and s[i] not in special:
                 buff.append(s[i])
                 i += 1
-            tokens.append("".join(buff))
+            tokens.append(''.join(buff))
 
         return tokens
 
@@ -1511,6 +1534,18 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
 
     return log_data
 
+# For better efficiency, cache already compiled regex patterns for validation
+compiled_regex_cache = {}
+
+def get_compiled_pattern(pattern_str):
+    """
+    Returns a compiled regex pattern.
+    If the pattern is not already compiled, it compiles it and stores it in the cache.
+    """
+    if pattern_str not in compiled_regex_cache:
+        compiled_regex_cache[pattern_str] = re.compile(pattern_str)
+    return compiled_regex_cache[pattern_str]
+    
 def validate_event(event: Dict[str, Any], rules: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """
     Validates an event based on the provided rules.
@@ -1523,6 +1558,7 @@ def validate_event(event: Dict[str, Any], rules: Dict[str, Any]) -> Tuple[bool, 
         "str": lambda v: isinstance(v, str),
     }
 
+    
     def check_structure(data: Dict[str, Any], rule: Dict[str, Any], path: str = ""):
         for key, expected in rule.items():
             required = key.startswith("!")
@@ -1535,16 +1571,24 @@ def validate_event(event: Dict[str, Any], rules: Dict[str, Any]) -> Tuple[bool, 
 
             value = data[clean_key]
 
+            # Validate basic types
             if isinstance(expected, str):
-                # Validate basic types
-                if expected in type_checks and not type_checks[expected](value):
-                    errors.append(f"{path}{clean_key} should be a {expected}")
-                # Validate regex pattern
-                elif expected.startswith("/") and not re.match(expected.strip("/"), str(value)):
-                    errors.append(f"{path}{clean_key} does not match the pattern {expected}")
+                if expected.lower() in allowed_validation_types:
+                    expected_type = expected.strip('<>').lower()
+                    if expected_type in type_checks and not type_checks[expected_type](value):
+                        errors.append(f"{path}{clean_key} should be a {expected_type}")
+                elif expected.startswith("/"):
+                    expected_first = expected.find('/')
+                    expected_last = expected.rfind('/')
+                    if expected_first == -1 or expected_last <= expected_first:
+                        errors.append(f"{path}{clean_key} has an invalid regex pattern {expected}")
+                    else:
+                        pattern = expected[expected_first+1:expected_last]
+                        compiled_pattern = get_compiled_pattern(pattern)
+                        if not compiled_pattern.fullmatch(str(value)):
+                            errors.append(f"{path}{clean_key} does not match the pattern /{pattern}/")
                 else:
-                    # literal string
-                    if str(value) != expected:
+                    if value != expected:
                         errors.append(f"{path}{clean_key} = {value} should be '{expected}'")
 
             elif isinstance(expected, dict):

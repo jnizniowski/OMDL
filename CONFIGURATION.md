@@ -1,6 +1,6 @@
 # OMDL Configuration Reference
 
-## General Configuration Options
+## General Configuration
 
 | Option | Description | Default Value |
 |--------|-------------|---------------|
@@ -14,7 +14,7 @@
 | `output_destination` | Where to save results ("excel" or "google_sheets") | "excel" |
 | `output_folder` | Directory where output files will be saved | Current directory |
 
-## Script Blocking Options
+## Script Blocking
 
 | Option | Description | Default Value |
 |--------|-------------|---------------|
@@ -24,7 +24,7 @@
 | `block_domains` | List of domains to block requests | null (no domains) |
 | `css_elements_to_hide` | CSS selectors of elements to hide | null (so selectors) |
 
-## Event Tracking Options
+## Event Tracking
 
 | Option | Description | Default Value |
 |--------|-------------|---------------|
@@ -40,7 +40,7 @@
 | `token_location` | Where to store/look for auth token ("file" or "env") | "file" |
 | `folder_id` | Google Drive folder ID for saving files | null (root directory) |
 
-## Step Configuration Options
+## Step Configuration
 
 ### Visit Steps
 | Parameter | Description | Required |
@@ -89,7 +89,15 @@ Field definition options:
 |-----------|-------------|----------|
 | `steps` | Array of step names to execute in order | Yes |
 
-## Visit Steps
+## Validation Steps
 | Parameter | Description | Required |
 |-----------|-------------|----------|
 | `code` | A block of the syntaxed, JSON-ish declaration of expected parameters and values | Yes |
+
+### Validation syntax:
+- `!` before parameter name means it's required (`!event_name: "view_item"`)
+- expected literal values: as in dataLayer (`quantity: 1`, `currency: "USD"`)
+- regex (full match): between two `/`; use Python regex syntax (`city: /Paris|London/`)
+- define data types: <str> for strings, <int> for integers, or <float> for numbers with decimals (`price: <float>`)
+- quotes for parameter names are optional but allowed
+- indentation is also optional but allowed

@@ -221,7 +221,7 @@ steps = [                           # All sequences will be performed and saved 
 # !key1: 'value1',                # "!" means required
 # key2: 'value2',                 # optional
 # key3: /Paris|London/,           # regex pattern (inside /.../) - must match
-# key4: {{type}},                 # data type (string, int, float)
+# key4: <type>,                 # data type (str, int, float)
 # 'key5': 'value5',               # quotes are optional but allowed
 #   'key6': 'value6',             # indentation is also optional but allowed
 
@@ -232,24 +232,24 @@ code = '''
   !event: 'purchase',
   !ecommerce: {
     !transaction_id: /\w{5,10}/,
-    !value: {{float}},
-    tax: {{float}},
-    shipping: {{float}},
+    !value: <float>,
+    tax: <float>,
+    shipping: <float>,
     !currency: /USD|PLN|GBP/,
-    coupon: {{string}},
+    coupon: <str>,
     !items: [
     {
-      !item_id: {{string}},
-      !item_name: {{string}},
-      affiliation: {{string}},
-      coupon: {{string}},
-      discount: {{float}},
-      index: {{int}},
-      !item_brand: {{string}},
-      !item_category: {{string}},
-      item_variant: {{string}},
-      !price: {{float}},
-      !quantity: {{int}}
+      !item_id: <str>,
+      !item_name: <str>,
+      affiliation: <str>,
+      coupon: <str>,
+      discount: <float>,
+      index: <int>,
+      !item_brand: <str>,
+      !item_category: <str>,
+      item_variant: <str>,
+      !price: <float>,
+      !quantity: <int>
     }]
   }
 '''
@@ -259,18 +259,18 @@ code = '''
   !event: 'add_to_cart',
   !ecommerce: {
     !currency: /USD|PLN|GBP/,
-    !value: {{float}},
-    coupon: {{string}},
+    !value: <float>,
+    coupon: <str>,
     !items: [
     {
-      !item_id: {{string}},
-      !item_name: {{string}},
-      !item_brand: {{string}},
-      !item_category: {{string}},
-      item_variant: {{string}},
-      !price: {{float}},
-      !quantity: {{int}},
-      discount: {{float}}
+      !item_id: <str>,
+      !item_name: <str>,
+      !item_brand: <str>,
+      !item_category: <str>,
+      item_variant: <str>,
+      !price: <float>,
+      !quantity: <int>,
+      discount: <float>
     }]
   }
 '''
