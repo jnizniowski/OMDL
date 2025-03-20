@@ -6,6 +6,9 @@ import sys
 import json
 import os
 import pickle
+import re
+
+from typing import Dict, Any, Tuple, List
 from pathlib import Path
 from queue import Queue
 from threading import Thread, Event
@@ -13,6 +16,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 from collections import deque
 from datetime import datetime
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -22,13 +26,13 @@ from googleapiclient.errors import HttpError
 
 ##### PROJECT INFO
 PROJECT_NAME = "OMDL (Oh My DataLayer)"
-PROJECT_VERSION = "0.9"
+PROJECT_VERSION = "1.0"
 PROJECT_AUTHOR = "Jakub Niżniowski"
 PROJECT_URL = "https://github.com/jnizniowski/OMDL"
-PROJECT_DESCRIPTION = "DataLayer events scraping tool"
+PROJECT_DESCRIPTION = "DataLayer events scraping & validation tool"
 
 PROJECT_LICENSE = "MIT License"
-PROJECT_COPYRIGHT = "Copyright (c) 2024 Jakub Niżniowski"
+PROJECT_COPYRIGHT = "Copyright (c) 2025 Jakub Niżniowski"
 
 PROJECT_HEADER = f"""
 {'='*60}
@@ -39,19 +43,22 @@ Documentation: {PROJECT_URL}
 {'='*60}
 """
 
+allowed_validation_types = {'<int>', '<float>', '<str>', '<bool>'}
 
 ##### CLASSES
 
 class LogCollector:
     """Collect log messages with timestamps for debugging"""
-    def __init__(self):
+    def __init__(self, console_levels=("INFO", "WARNING", "ERROR")):
         self.logs = deque()  # deque seems to be better large logs
+        self.console_levels = console_levels
         
-    def log(self, message, level="INFO"):
+    def log(self, message, level="DEBUG"):
         """Add a log message, timestamp and level"""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.logs.append([timestamp, level, message])
-        print(message)
+        if level in self.console_levels:
+            print(message)
         
     def get_logs(self):
         """Return all logs"""
@@ -95,7 +102,7 @@ class ExcelWriter:
             
             # Save workbook
             self.workbook.save(self.output_path)
-            self.logger.log(f"Data successfully saved to Excel: {self.output_path}")
+            # self.logger.log(f"Data successfully saved to Excel: {self.output_path}", "INFO")
             return str(self.output_path)
             
         except Exception as e:
@@ -107,7 +114,7 @@ class ExcelWriter:
         """Write sequence data to a sheet"""
         
         # Headers
-        headers = ["Step", "Event", "Timestamp", "URL", "Event Data"]
+        headers = ["Step", "Event", "Timestamp", "URL", "Event Data", "Valid", "Error Details"]
         sheet.append(headers)
         
         # Set column & row sizes
@@ -116,35 +123,20 @@ class ExcelWriter:
         sheet.column_dimensions['C'].width = 20  # Timestamp
         sheet.column_dimensions['D'].width = 50  # URL
         sheet.column_dimensions['E'].width = 100  # Event Data
+        sheet.column_dimensions['F'].width = 20  # Valid
+        sheet.column_dimensions['G'].width = 100  # Error Details
         
         sheet.sheet_format.defaultRowHeight = 20 # Default row height for all rows
         sheet.row_dimensions[1].height = 15 # Header row height
         
         # Write data
         for entry in data:
-            cleaned_entry = self._clean_data_entry(entry)
-            sheet.append(cleaned_entry)
+            sheet.append(list(entry))
         
         # Apply text wrapping to Event Data column
         for row in sheet.iter_rows(min_row=2, min_col=5, max_col=5):
             for cell in row:
-                cell.alignment = openpyxl.styles.Alignment(wrapText=True)
-    
-    def _clean_data_entry(self, entry):
-        """Clean and format a single data entry"""
-        cleaned_entry = []
-        for i, item in enumerate(entry):
-            if isinstance(item, str):
-                if i == 4 and item.startswith('{'): # Event Data column
-                    try:
-                        parsed_json = json.loads(item)
-                        item = json.dumps(parsed_json, indent=2, ensure_ascii=False)
-                    except json.JSONDecodeError:
-                        pass
-                if len(item) > 32000:  # Safety measure for too long values (Excel doesn't like that)
-                    item = item[:32000] + "... (truncated)"
-            cleaned_entry.append(item)
-        return cleaned_entry
+                cell.alignment = openpyxl.styles.Alignment(wrapText=False)
     
     def _write_debug_logs(self, sheet, debug_logs):
         """If enabled, write debug logs to an additional sheet"""
@@ -268,7 +260,7 @@ class GoogleSheetsAuth:
                     self.logger.log("Refreshing Google Sheets access token...")
                     self.credentials.refresh(Request())
                 else:
-                    self.logger.log("Starting new Google Sheets authentication flow...")
+                    self.logger.log("Starting new Google Sheets authentication flow...", "INFO")
                     flow = InstalledAppFlow.from_client_secrets_file(
                         self.credentials_path,
                         self.SCOPES
@@ -345,7 +337,6 @@ class GoogleSheetsWriter:
                             spreadsheetId=self.spreadsheet_id,
                             body={'requests': [delete_request]}
                         ).execute()
-                        # self.logger.log("Removed a default sheet")
                     except Exception as e:
                         self.logger.log(f"Warning: Could not remove default Sheet1: {str(e)}", "WARNING")
                     
@@ -356,7 +347,7 @@ class GoogleSheetsWriter:
                 self._write_debug_logs(debug_logs)
             
             self.spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{self.spreadsheet_id}"
-            self.logger.log(f"Data successfully saved to Google Sheets: {self.spreadsheet_url}")
+            #self.logger.log(f"Data successfully saved to Google Sheets: {self.spreadsheet_url}", "INFO")
             return self.spreadsheet_url
         
         except HttpError as e:
@@ -412,7 +403,7 @@ class GoogleSheetsWriter:
         """Write sequence data to a sheet"""
         try:
             # Prepare headers and values
-            headers = ["Step", "Event", "Timestamp", "URL", "Event Data"]
+            headers = ["Step", "Event", "Timestamp", "URL", "Event Data", "Valid", "Error Details"]
             values = [headers] + data
             
             # Create new sheet
@@ -500,6 +491,21 @@ class GoogleSheetsWriter:
                         }
                     }
                 },
+                # Set column width for URLs
+                 {
+                    'updateDimensionProperties': {
+                        'range': {
+                            'sheetId': sheet_id,
+                            'dimension': 'COLUMNS',
+                            'startIndex': 3,
+                            'endIndex': 4 
+                        },
+                        'properties': {
+                            'pixelSize': 200
+                        },
+                        'fields': 'pixelSize'
+                    }
+                },
                 # Set row height
                 {
                     'updateDimensionProperties': {
@@ -569,6 +575,242 @@ def clean_error_message(error):
         cleaned = f"Browser error occurred: {error.__class__.__name__}"
     return cleaned
 
+def parse_validation_from_toml(config, logger):
+    """
+    Parse validation rules from TOML config.
+    Returns a dictionary of event_name -> validation_rules.
+    """
+    validation_rules = {}
+    
+    if 'validation' not in config:
+        return validation_rules
+        
+    for event_name, event_config in config['validation'].items():
+        if 'code' not in event_config:
+            continue
+            
+        code_str = event_config['code']
+        # Remove whitespace and newlines
+        code_str = code_str.strip()
+        if not (code_str.startswith('{') and code_str.endswith('}')):
+            code_str = "{" + code_str + "}"
+        # Remove comments and clean up
+        code_lines = [line.split('#')[0].strip() for line in code_str.split('\n')]
+        code_str = ' '.join(code_lines)
+        
+        try:
+            rule_dict = parse_validation_code_block(code_str, logger)
+            validation_rules[event_name] = rule_dict
+        except ValueError as e:
+            print(f"Error parsing validation rule for {event_name}: {str(e)}")
+    
+    return validation_rules
+
+def parse_validation_code_block(code_str, logger):
+    """
+    A parser for validation blocks from TOML files.
+    Returns a dictionary structure.
+    """
+    def tokenize(s):
+        """
+        Tokenize string into: { } [ ] : , /regex/ <type> strings
+        or unquoted keys. Returns a list of tokens.
+        """
+        tokens = []
+        i = 0
+        while i < len(s):
+            c = s[i]
+
+            # Skip whitespace
+            if c.isspace():
+                i += 1
+                continue
+
+            # Single character tokens
+            if c in '{}[]:,':
+                tokens.append(c)
+                i += 1
+                continue
+
+            # Regex patterns
+            if s.startswith('/', i):
+                j = s.find('/', i+1)
+                if j == -1:
+                    raise ValueError("Unclosed '/' in regex pattern")
+                regex_token = s[i:j+1]
+                try:
+                    re.compile(regex_token[1:-1])  # Validate it's a valid regex
+                    tokens.append(regex_token)
+                    i = j+1
+                    continue
+                except re.error:
+                    raise ValueError(f"Invalid regex pattern: {regex_token}")
+
+            # Type specifiers
+            if s.startswith('<', i):
+                j = s.find('>', i+1)
+                if j == -1:
+                    raise ValueError("Unclosed '< >' for type")
+                type_token = s[i:j+1]
+                # Validate allowed type specifiers
+                if type_token.lower() not in allowed_validation_types:
+                    raise ValueError(f"Invalid type specifier '{type_token}'. Must be one of: {', '.join(allowed_validation_types)}")
+                tokens.append(type_token)
+                i = j+1
+                continue
+
+            # Quoted strings
+            if s.startswith('"', i) or s.startswith("'", i):
+                quote_char = s[i]
+                j = i + 1
+                buff = []
+                escaped = False
+                
+                while j < len(s):
+                    curr_char = s[j]
+                    
+                    if escaped:
+                        # Handle escaped character
+                        if curr_char == quote_char or curr_char == '\\':
+                            buff.append(curr_char)
+                        else:
+                            buff.append('\\' + curr_char)
+                        escaped = False
+                        j += 1
+                        continue
+                        
+                    if curr_char == '\\':
+                        escaped = True
+                        j += 1
+                        continue
+                        
+                    if curr_char == quote_char:
+                        break
+                        
+                    buff.append(curr_char)
+                    j += 1
+                    
+                if j >= len(s) or s[j] != quote_char:
+                    raise ValueError(f"Unterminated string starting at position {i}")
+                    
+                tokens.append(''.join(buff))
+                i = j + 1
+                continue
+
+            # Unquoted keys/values 
+            special = set('{}[]:,"\'/ \t\n\r')
+            buff = []
+            while i < len(s) and s[i] not in special:
+                buff.append(s[i])
+                i += 1
+            tokens.append(''.join(buff))
+
+        return tokens
+
+    # Functions to parse objects, lists, etc. using tokens
+    tokens = tokenize(code_str)
+    index = 0  # global pointer to token list
+
+    def peek():
+        return tokens[index] if index < len(tokens) else None
+
+    def consume(expected=None):
+        nonlocal index
+        if index >= len(tokens):
+            return None
+        t = tokens[index]
+        index += 1
+        if expected and t != expected:
+            raise ValueError(f"Expected '{expected}' but got '{t}'")
+        return t
+
+    def parse_value():
+        t = peek()
+        if t == '{':
+            return parse_object(logger)
+        elif t == '[':
+            return parse_array()
+        elif t and t.startswith('/'):  # /regex/
+            consume()
+            return t  # return as is
+        elif t and t.startswith('<'):  # <type>
+            consume()
+            return t  # return as is
+        else:
+            # treat anything else as string
+            return consume()
+
+    def parse_object(logger):
+        obj = {}
+        consume('{')
+        first = True
+        while True:
+            t = peek()
+            if t == '}':
+                consume('}')
+                break
+            if not first and t == ',':
+                consume(',')
+                if peek() == '}':
+                    consume('}')
+                    break
+            # key
+            key = parse_value() 
+            if not isinstance(key, str):
+                logger.log(f"⚠️  Validation key should be a string: {str(key)}.\nPlease review your configuration file.", "ERROR")
+            # Handle required field marker (!)
+            required = False
+            if key.startswith('!'):
+                required = True
+                key = key[1:]  # Remove the ! prefix
+            
+            # Handle quoted keys
+            if key.startswith('"') and key.endswith('"') or key.startswith("'") and key.endswith("'"):
+                key = key[1:-1]  # Remove quotes
+                
+            # colon
+            if peek() == ':':
+                consume(':')
+            # value
+            val = parse_value()
+            
+            # Store with metadata for required fields
+            if required:
+                obj[f"!{key}"] = val
+            else:
+                obj[key] = val
+            first = False
+        return obj
+
+    def parse_array():
+        """
+        Parse a list structure from the tokenized input.
+        Returns a Python list containing the parsed elements.
+        """
+        arr = []
+        consume('[')
+        first = True
+        while True:
+            t = peek()
+            if t == ']':
+                consume(']')
+                break
+            if not first and t == ',':
+                consume(',')
+                if peek() == ']':
+                    consume(']')
+                    break
+            val = parse_value()
+            arr.append(val)
+            first = False
+        return arr
+
+    # Start main parsing
+    if not tokens:
+        return {}
+    result = parse_object(logger) if tokens[0] == '{' else parse_object(logger)
+    return result
+
 def validate_sequence(config, logger):
     """
     Validate the entire sequence configuration with detailed checks.
@@ -595,7 +837,7 @@ def validate_sequence(config, logger):
     # if missing_config:
     #     raise ValueError(f"Missing required config fields: {', '.join(missing_config)}")
     
-# Validate output configuration
+    # Validate output configuration
     output_destination = config['config'].get('output_destination', 'excel')
     if output_destination not in ['excel', 'google_sheets']:
         logger.log(f"Warning: Invalid output_destination '{output_destination}' - must be 'excel' or 'google_sheets'. Using 'excel' as default.", "WARNING")
@@ -759,12 +1001,14 @@ def load_config(config_path, logger):
         logger.log(f"Loading configuration from {config_path}")
         with open(config_path, 'r') as file:
             config = toml.load(file)
-
+        
+        config['validation'] = parse_validation_from_toml(config, logger)
+             
         # track_events configuration (all if not specified)
         if 'config' in config:
             track_events = config['config'].get('track_events')
             if track_events is None or (isinstance(track_events, list) and not track_events):
-                logger.log("No track_events specified - will track all events")
+                logger.log("No track_events specified - will track all events", "INFO")
                 config['config']['track_events'] = None
 
         validate_sequence(config, logger)
@@ -786,6 +1030,9 @@ def initialize_browser(config, logger):
             user_agent += " Selenium"
             
         browser_options.add_argument(f'user-agent={user_agent}')
+        browser_options.add_argument("--log-level=3") # Disable logging for webdriver
+        browser_options.add_experimental_option('excludeSwitches', ['enable-logging']) # Disable DevTools logs
+        browser_options.add_argument("--disable-usb") # fixes some error logs; remove if you really need USB
         
         # Add request blocking if configured
         block_rules = []
@@ -902,7 +1149,7 @@ def wait_for_element(browser, params, config, logger):
         # Quick filter exclude elements with 0 width/height
         candidates = [e for e in elements if has_dimensions(e)]
         total_matches = len(candidates)
-        logger.log(f"{len(elements)} out of {total_matches} matches qualified")
+        logger.log(f"{total_matches} out of {len(elements)} matches qualified")
         
         if total_matches > max_elements:
             warning_msg = f"Warning: Selector '{selector}' matches {total_matches} elements - consider using a more specific selector"
@@ -922,12 +1169,12 @@ def wait_for_element(browser, params, config, logger):
             # Detailed check for this element only
             if not is_element_clickable(element):
                 candidates.remove(element)
-                logger.log(f"Selected element not clickable, trying another ({len(candidates)} remaining)")
+                logger.log(f"🔎 Selected element not clickable, trying another ({len(candidates)} remaining)", "INFO")
                 continue
             
             # If element needs scrolling
             if not element.is_displayed():
-                logger.log("Selected element not in viewport, scrolling into view")
+                logger.log("🔎 Selected element not in viewport, scrolling into view", "INFO")
                 browser.execute_script("""
                     arguments[0].scrollIntoView({
                         block: 'center',
@@ -941,11 +1188,11 @@ def wait_for_element(browser, params, config, logger):
                 WebDriverWait(browser, 3).until(  # Short timeout for final check
                     lambda driver: element.is_displayed() and element.is_enabled()
                 )
-                logger.log("Element is now visible and clickable")
+                logger.log("🎯 Element is now visible and clickable", "INFO")
                 return element
             except:
                 candidates.remove(element)
-                logger.log("Element is not clickable after scroll, trying another one")
+                logger.log("🔎 Element is not clickable after scroll, trying another one", "INFO")
                 continue
                 
         if total_matches > max_elements:
@@ -1007,6 +1254,9 @@ def start_monitoring_thread(browser, monitored_events, event_queue, stop_event, 
     error_cooldown = 0
     last_valid_url = None
     
+    # Get validation rules from config
+    validation_rules = config.get('validation', {})
+
     # Get the initial URL from the first visit step in the first sequence
     initial_url = None
     try:
@@ -1042,26 +1292,54 @@ def start_monitoring_thread(browser, monitored_events, event_queue, stop_event, 
                 continue
                 
             for event in datalayer:
-                if not isinstance(event, dict):
-                    continue
-                    
-                if 'event' not in event:
+                if not isinstance(event, dict) or 'event' not in event:
                     continue
                     
                 try:
                     sanitized_event = sanitize_event_data(event)
                     event_id = f"{event['event']}_{hash(json.dumps(sanitized_event, sort_keys=True))}"
                     
-                    if (event_id not in processed_events and
-                        (monitored_events is None or event['event'] in monitored_events)):
-                        event_queue.put({
-                            'event_name': event['event'],
-                            'event_data': sanitized_event,
-                            'timestamp': datetime.now(),
-                            'url': url_to_log
-                        })
-                        processed_events.add(event_id)
-                        logger.log(f"Found new event: {event['event']}")
+                    if event_id in processed_events or (monitored_events and event['event'] not in monitored_events):
+                        continue
+                    
+                    valid_flag = None
+                    error_details = None
+                    is_valid = None
+                    errors = []
+
+                    if validation_rules:
+                        event_name = event['event']
+                        rule_for_event = validation_rules.get(event_name, {})
+                        if rule_for_event:
+                            is_valid, errors = validate_event(sanitized_event, rule_for_event)
+                            valid_flag = "✔️" if is_valid else "❌"
+                            error_details = errors if not is_valid else None
+                        else:
+                            valid_flag = "-"
+                            error_details = None
+                    else:
+                        valid_flag = "-"
+                        error_details = None
+
+                    # Add validation result to the event record
+                    event_queue.put({
+                        'event_name': event['event'],
+                        'event_data': sanitized_event,
+                        'timestamp': datetime.now(),
+                        'url': url_to_log,
+                        'valid': valid_flag,
+                        'error_details': error_details
+                    })
+                    
+                    processed_events.add(event_id)
+
+                    if is_valid is True:
+                        logger.log(f"✅ Valid event: {event['event']}")
+                    elif is_valid is False:
+                        logger.log(f"⚠️  Invalid event: {event['event']}", "ERROR")
+                    else:
+                        logger.log(f"🟦 Not validated (no rule): {event['event']}")
+
                 except Exception as inner_e:
                     logger.log(f"Error processing event: {clean_error_message(inner_e)}", "ERROR")
                     
@@ -1088,29 +1366,46 @@ def process_queued_events(event_queue, log_data, current_step, logger, until_tim
                 event['event_name'],
                 event['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
                 event['url'],
-                json.dumps(event['event_data'], indent=2)  # Added indentation for better formatting
+                json.dumps(event['event_data'], indent=2, ensure_ascii=False) , # Added indentation for better formatting and ensure_ascii=False to display non-ASCII characters
+                event['valid'],
+                json.dumps(event.get('error_details', '-'), indent=2, ensure_ascii=False) if event.get('error_details') else "-"
             ])
         except Exception as e:
             logger.log(f"Error processing event from queue: {clean_error_message(e)}", "ERROR")
 
 def perform_action(browser, action_type, params, config, logger):
     """Perform a single browser action - visit, click, form, scroll"""
+    
+    def do_click(element, browser, method="selenium"):
+        """Provide different methods of clicking an element."""
+        if method == "selenium":
+            try:
+                element.click()
+            except Exception:
+                browser.execute_script("arguments[0].click();", element)
+        elif method == "js":
+            browser.execute_script("arguments[0].click();", element)
+        elif method == "action":
+            ActionChains(browser).move_to_element(element).click().perform()
+        else:
+            raise ValueError(f"Unsupported click_method: {method}")
+    
     try:
-        current_url = browser.current_url
-        logger.log(f"Current URL when performing action: {current_url}")
+        if action_type != 'visit':
+            logger.log(f"➡️  Current URL: {browser.current_url}", "INFO")
 
         if action_type == 'scroll':
             if 'selector' in params or 'xpath' in params:
                 element = wait_for_element(browser, params, config, logger)
-                logger.log(f"Scrolling to element")
+                logger.log(f"➡️ Scrolling to element", "INFO")
                 browser.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", element)
             elif 'pixels' in params:
                 scroll_amount = params['pixels']
-                logger.log(f"Scrolling by {scroll_amount} pixels")
+                logger.log(f"➡️ Scrolling by {scroll_amount} pixels", "INFO")
                 browser.execute_script(f"window.scrollBy(0, {scroll_amount});")
             elif 'percentage' in params:
                 scroll_percentage = params['percentage']
-                logger.log(f"Scrolling to {scroll_percentage}% of page")
+                logger.log(f"➡️ Scrolling to {scroll_percentage}% of page", "INFO")
                 browser.execute_script(f"""
                     let pageHeight = Math.max(
                         document.body.scrollHeight,
@@ -1138,6 +1433,7 @@ def perform_action(browser, action_type, params, config, logger):
                     WebDriverWait(browser, config['config'].get('default_timeout', 10)).until(
                         lambda driver: driver.execute_script('return document.readyState') == 'complete'
                     )
+                    logger.log(f"➡️  Current URL: {browser.current_url}", "INFO")
                     logger.log("Page load completed")
                     inject_css(browser, config, logger)
                 except Exception as e:
@@ -1166,7 +1462,7 @@ def perform_action(browser, action_type, params, config, logger):
                         browser.execute_script("arguments[0].click();", element)
                         
                     by_strategy, selector = get_element_locator(click_params, config)
-                    logger.log(f"Clicked element {i+1}: {selector}")
+                    logger.log(f"➡️  Clicked element {i+1}: {selector}" , "INFO")
                     success_count += 1
                     
                     # Handle delay between individual clicks
@@ -1187,16 +1483,15 @@ def perform_action(browser, action_type, params, config, logger):
                 return "All clicks completed successfully"
             
         elif action_type == 'form':
+            submit_method = params.get('submit_method', 'selenium')
             for field in params['fields']:
                 element = wait_for_element(browser, field, config, logger)
-                element.clear() # clear input before filling in
+                element.clear()  # clear input before filling in
                 element.send_keys(field['value'])
             submit_button = wait_for_element(browser, {'xpath': params['submit_button']}, config, logger)
-            try:
-                submit_button.click()
-            except Exception as e:
-                browser.execute_script("arguments[0].click();", element)
+            do_click(submit_button, browser, submit_method) # click the submit button with the specified method
             return "Form submitted successfully"
+
             
     except Exception as e:
         error_msg = clean_error_message(e)
@@ -1215,7 +1510,7 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
         step = steps_definitions[step_name]
         is_final_step = i == len(sequence['steps']) - 1
         
-        logger.log(f"\n=== Starting step: {step_name} ===")
+        logger.log(f"\n=== Starting step: {step_name} ===", "INFO")
         
         try:
             # Inject CSS before any action (in perform_action there is an additional injection for visit steps after page load)
@@ -1230,7 +1525,7 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
             
             # Handle delays based on step type and position
             if is_final_step:
-                logger.log(f"Final step - waiting {delay} seconds for events...")
+                logger.log(f"Final step - waiting {delay} seconds for events...", "INFO")
             else:
                 logger.log(f"Waiting {delay} seconds after {step['type']} step...")
                 
@@ -1247,7 +1542,7 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
             else:
                 process_queued_events(event_queue, log_data, step_name, logger, step_end_time)
 
-            logger.log(f"Step {step_name} completed successfully")
+            logger.log(f"🎉 Step {step_name} completed successfully", "INFO")
                 
         except Exception as e:
             error_msg = clean_error_message(e)
@@ -1257,10 +1552,89 @@ def perform_sequence(browser, config, event_queue, sequence, logger):
                 'Error',
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 browser.current_url,
-                error_msg
+                error_msg,
+                "-",
+                "-"
             ])
 
     return log_data
+
+# For better efficiency, cache already compiled regex patterns for validation
+compiled_regex_cache = {}
+
+def get_compiled_pattern(pattern_str):
+    """
+    Returns a compiled regex pattern.
+    If the pattern is not already compiled, it compiles it and stores it in the cache.
+    """
+    if pattern_str not in compiled_regex_cache:
+        compiled_regex_cache[pattern_str] = re.compile(pattern_str)
+    return compiled_regex_cache[pattern_str]
+    
+def validate_event(event: Dict[str, Any], rules: Dict[str, Any]) -> Tuple[bool, List[str]]:
+    """
+    Validates an event based on the provided rules.
+    """
+    errors = []
+    
+    type_checks = {
+        "int": lambda v: isinstance(v, int) and not isinstance(v, bool),
+        "float": lambda v: isinstance(v, (int, float)),
+        "str": lambda v: isinstance(v, str),
+        "bool": lambda v: isinstance(v, bool),
+    }
+
+    
+    def check_structure(data: Dict[str, Any], rule: Dict[str, Any], path: str = ""):
+        for key, expected in rule.items():
+            required = key.startswith("!")
+            clean_key = key.lstrip("!")
+
+            if clean_key not in data:
+                if required:
+                    errors.append(f"Missing required field: {path}{clean_key}")
+                continue
+
+            value = data[clean_key]
+
+            # Validate basic types
+            if isinstance(expected, str):
+                if expected.lower() in allowed_validation_types:
+                    expected_type = expected.strip('<>').lower()
+                    if expected_type in type_checks and not type_checks[expected_type](value):
+                        errors.append(f"{path}{clean_key} should be a {expected_type}")
+                elif expected.startswith("/"):
+                    expected_first = expected.find('/')
+                    expected_last = expected.rfind('/')
+                    if expected_first == -1 or expected_last <= expected_first:
+                        errors.append(f"{path}{clean_key} has an invalid regex pattern {expected}")
+                    else:
+                        pattern = expected[expected_first+1:expected_last]
+                        compiled_pattern = get_compiled_pattern(pattern)
+                        if not compiled_pattern.fullmatch(str(value)):
+                            errors.append(f"{path}{clean_key} does not match the pattern /{pattern}/")
+                else:
+                    if value != expected:
+                        errors.append(f"{path}{clean_key} = {value} should be '{expected}'")
+
+            elif isinstance(expected, dict):
+                # Validate nested objects
+                if not isinstance(value, dict):
+                    errors.append(f"{path}{clean_key} should be an object")
+                else:
+                    check_structure(value, expected, path + clean_key + ".")
+
+            elif isinstance(expected, list) and expected:
+                # Validate lists with expected structure
+                if not isinstance(value, list):
+                    errors.append(f"{path}{clean_key} should be a list")
+                else:
+                    for i, item in enumerate(value):
+                        check_structure(item, expected[0], f"{path}{clean_key}[{i}].")
+
+    check_structure(event, rules)
+    
+    return (len(errors) == 0, errors)
 
 def get_output_folder(config, logger):
     """  Get and create output folder if it doesn't exist. """
@@ -1288,7 +1662,7 @@ def get_output_folder(config, logger):
         logger.log(f"Error creating output folder: {clean_error_message(e)}", "ERROR")
         # Fall back to script directory
         folder_path = Path().absolute()
-        logger.log(f"Using fallback output folder: {folder_path}")
+        logger.log(f"Using fallback output folder: {folder_path}", "INFO")
     
     return folder_path
 
@@ -1308,15 +1682,17 @@ def save_results(config, logger, log_data, debug_logs=None):
         writer = ExcelWriter(config, logger)
         return writer.save_data(log_data, debug_logs)
 
-def main():
+def main(debug_prints=False):
+    """Main execution function with optional debug printing"""
     print(PROJECT_HEADER)
 
     if len(sys.argv) < 2:
-        print("Usage: python script.py <config_path>")
+        print("Usage: python omdl.py <config_path>")
         sys.exit(1)
 
     config_path = sys.argv[1]
-    print(f"Starting script with configuration: {config_path}")
+    if debug_prints:
+        print(f"Starting OMDL with configuration: {config_path}")
     
     logger = LogCollector()
     config = load_config(config_path, logger)
@@ -1326,12 +1702,14 @@ def main():
     log_data = {}  # Dictionary to store data for each sequence
     
     try:
-        logger.log("Initializing script...")
+        if debug_prints:
+            logger.log("Initializing OMDL...", "INFO")
         browser = initialize_browser(config, logger)
         
         # Process each sequence
         for sequence_name, sequence in config['sequence'].items():
-            logger.log(f"=== Starting sequence: {sequence_name} ===")
+            if debug_prints:
+                logger.log(f"=== Starting sequence: {sequence_name} ===", "INFO")
             
             # Create thread communication objects for this sequence
             event_queue = Queue()
@@ -1352,15 +1730,18 @@ def main():
             
             # Stop monitoring for this sequence
             stop_monitoring.set()
+            monitor_thread.join()
             
         # Save results
         output_path = save_results(config, logger, log_data, 
                                  logger.get_logs() if config['config'].get('debug_mode', False) else None)
-        logger.log(f"Results saved to: {output_path}")
+        if debug_prints:
+            logger.log(f"Results saved to: {output_path}", "INFO")
             
     except Exception as e:
         error_msg = clean_error_message(e)
-        logger.log(f"Critical error: {error_msg}", "ERROR")
+        if debug_prints:
+            logger.log(f"Critical error: {error_msg}", "ERROR")
         # Create error data
         error_data = [
             ['FATAL_ERROR', 'Script Error', 
@@ -1373,16 +1754,18 @@ def main():
             # Try to save error information
             output_path = save_results(config, logger, log_data, 
                                      logger.get_logs() if config['config'].get('debug_mode', False) else None)
-            logger.log(f"Error information saved to: {output_path}")
+            if debug_prints:
+                logger.log(f"Error information saved to: {output_path}")
         except Exception as save_error:
-            print(f"Could not save error information: {clean_error_message(save_error)}")
+            if debug_prints:
+                print(f"Could not save error information: {clean_error_message(save_error)}")
             
     finally:
         if browser:
-            logger.log("Closing browser")
             browser.quit()
-        logger.log("Script completed 🎉")
+        if debug_prints:
+            logger.log("\n🎉🎉🎉 Done! 🎉🎉🎉", "INFO")
 
 # start
 if __name__ == "__main__":
-    main()
+    main(debug_prints=True)

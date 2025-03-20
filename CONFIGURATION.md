@@ -1,11 +1,10 @@
 # OMDL Configuration Reference
 
-## General Configuration Options
+## General Configuration
 
 | Option | Description | Default Value |
 |--------|-------------|---------------|
-| `title` | Base name for output files/sheets | 
-“datalayer” |
+| `title` | Base name for output files/sheets | “datalayer” |
 | `retries` | Number of times to retry failed actions | 2 |
 | `default_timeout` | How long to wait for elements to appear (seconds) | 10 |
 | `default_delay` | Default waiting time between steps (seconds) | 1 |
@@ -15,7 +14,7 @@
 | `output_destination` | Where to save results ("excel" or "google_sheets") | "excel" |
 | `output_folder` | Directory where output files will be saved | Current directory |
 
-## Script Blocking Options
+## Script Blocking
 
 | Option | Description | Default Value |
 |--------|-------------|---------------|
@@ -25,12 +24,12 @@
 | `block_domains` | List of domains to block requests | null (no domains) |
 | `css_elements_to_hide` | CSS selectors of elements to hide | null (so selectors) |
 
-## Event Tracking Options
+## Event Tracking
 
 | Option | Description | Default Value |
 |--------|-------------|---------------|
 | `track_events` | List of dataLayer event names to track | null (track all events) |
-| `user_agents` | List of user agents to randomly select from | [Chrome 91 on Windows 10] |
+| `user_agents` | List of user agents to randomly select from | Chrome 91 on Windows 10 |
 
 ## Google Sheets Options
 
@@ -41,7 +40,7 @@
 | `token_location` | Where to store/look for auth token ("file" or "env") | "file" |
 | `folder_id` | Google Drive folder ID for saving files | null (root directory) |
 
-## Step Configuration Options
+## Step Configuration
 
 ### Visit Steps
 | Parameter | Description | Required |
@@ -67,6 +66,7 @@ Click definition options:
 | `type` | Must be "form" | Yes |
 | `fields` | Array of form field definitions | Yes |
 | `submit_button` | XPath of submit button | Yes |
+| `submit_method` | "selenium" for a default submit method, "js" and "action" as alternatives when "selenium" fails | No |
 | `delay_after` | Delay after step execution (seconds) | No |
 
 Field definition options:
@@ -88,3 +88,20 @@ Field definition options:
 | Parameter | Description | Required |
 |-----------|-------------|----------|
 | `steps` | Array of step names to execute in order | Yes |
+
+## Validation Steps
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `code` | A block of the syntaxed, JSON-ish declaration of expected parameters and values | Yes |
+
+### Validation syntax:
+- `!` before parameter name means it's required (`!event_name: "view_item"`)
+- expected literal values: as in dataLayer (`quantity: 1`, `currency: "USD"`)
+- regex (full match): between two `/`; use Python regex syntax (`city: /Paris|London/`)
+- define data types: <str> for strings, <int> for integers, <float> for numbers with decimals or <bool> for true/false values - booleans (`price: <float>`)
+- quotes for parameter names (keys) are optional (but allowed)
+- indentation is also optional
+- commas after *key: value* pairs are optional as well
+
+
+The syntax was designed to let you copy the existing DL value (from a console or from your documentation) and to require only minimal adjustments. You don't have to bother with a proper JSON formatting.

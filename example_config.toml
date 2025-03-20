@@ -10,13 +10,16 @@
 # - [step]     - At least one step definition
 # - [sequence] - At least one sequence definition
 
+# Optional sections:
+# - [validation] - DataLayer validation rules
+
 [config]
 
 # Optional configuration with default values.
 # Edit, comment out, or remove.
 
 # Basic setup (all optional)
-title = "datalayer"                 # Base name for output files/sheets
+title = 'datalayer'                 # Base name for output files/sheets
 retries = 2                         # Number of times to retry failed actions
 default_timeout = 10                # How long to wait for elements to appear (in seconds)
 default_delay = 1                   # Default waiting time between steps (in seconds) - you can add extra delay in steps
@@ -27,8 +30,8 @@ include_selenium_info = false       # Add Selenium info to user agent - set to t
 bot_info = false                    # Add "?bot=true" parameter to URLs for transparency
 
 css_elements_to_hide = [            # CSS selectors of elements to hide via injected CSS (default: empty)
-    "#newsletter-modal",            # Useful for removing interfering elements, like modals or popups
-    "section > .popup-overlay"
+    '#newsletter-modal',            # Useful for removing interfering elements, like modals or popups
+    'section > .popup-overlay'
 ]
 
 
@@ -39,55 +42,55 @@ block_piwik = false                 # Block Piwik PRO scripts (same warning here
 
 # Additional domains to block (optional)
 block_domains = [                   # Block any domain requests (default: [])
-    "consent.cookiebot.com",        # Useful for blocking CMPs (cookie banners)
-    "analytics.example.com"         # other tracking tools or ssGTM containers
+    'consent.cookiebot.com',        # Useful for blocking CMPs (cookie banners)
+    'analytics.example.com'         # other tracking tools or ssGTM containers
 ]
 
 # User agent configuration (optional)
 user_agents = [                     # A list of user agents. If more than one, scipt randomly selects one of them. Default: Chrome 91 on Windows 10
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15"
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15'
 ]
 
 # Events to track (optional)
 track_events = [                   # List of dataLayer event names to track
-    "view_item_list",              # If not specified - track all events (you can remove the entire track_events parameter)
-    "select_item",                 # GA4 e-commerce events shown as example
-    "view_item",                   
-    "add_to_cart",
-    "remove_from_cart",
-    "view_cart",
-    "begin_checkout",
-    "add_shipping_info",
-    "add_payment_info",
-    "purchase"
+    'view_item_list',              # If not specified - track all events (you can remove the entire track_events parameter)
+    'select_item',                 # GA4 e-commerce events shown as example
+    'view_item',                   
+    'add_to_cart',
+    'remove_from_cart',
+    'view_cart',
+    'begin_checkout',
+    'add_shipping_info',
+    'add_payment_info',
+    'purchase'
 ]
 
 #### Output configuration
-output_destination = "excel"        # Optional: Where to save results: "excel" or "google_sheets"
+output_destination = 'excel'        # Optional: Where to save results: "excel" (default) or "google_sheets"
 
-output_folder = "results"           # Optional:  Where to save output files (default: current directory), applies only if output_destination = "excel"
+output_folder = 'results'           # Optional:  Where to save output files (default: current directory), applies only if output_destination = "excel"
 # Alternative absolute paths:
-# output_folder = "../omdl-results"                       # relative path
-# output_folder = "/Users/username/Documents/results"     # absolute path on macOS/Linux
-# output_folder = "C:\Users\username\Documents\results"   # absolute path on Windows
+# output_folder = '../omdl-results'                       # relative path
+# output_folder = '/Users/username/Documents/results'     # absolute path on macOS/Linux
+# output_folder = 'C:\Users\username\Documents\results'   # absolute path on Windows
 
 
 [config.google_sheets]      # Google Sheets configuration. Required only if output_destination = "google_sheets"
 
 # Option 1: File-based credentials (default option)
-credentials_location = "file"       # Where to look for Google API credentials 
+credentials_location = 'file'       # Where to look for Google API credentials 
                                     # (if incorrect or not available, "file" is a default value)
 
-credentials_path = "credentials.json"    # Path to Google API credentials file (required if credentials_location = "file")
-token_location = "file"                  # Where to store/look for auth token 
+credentials_path = 'credentials.json'    # Path to Google API credentials file (required if credentials_location = "file")
+token_location = 'file'                  # Where to store/look for auth token 
                                          # if equals "file", incorrect or not available, token.pickle file will be created in the same directory as credentials.json
 
 # Option 2: Environment-based credentials (recommended for security reasons, but requires additional setup)
-# credentials_location = "env"          # Will look for GOOGLE_SHEETS_CREDENTIALS_PATH
-# token_location = "env"               # Will look for GOOGLE_SHEETS_TOKEN_PATH
+# credentials_location = 'env'          # Will look for GOOGLE_SHEETS_CREDENTIALS_PATH
+# token_location = 'env'                # Will look for GOOGLE_SHEETS_TOKEN_PATH
 
-folder_id = "your_folder_id_here"       # Optional - Google Drive folder ID (if not specified, it'll save the file in the root direcory)
+folder_id = 'your_folder_id_here'       # Optional - Google Drive folder ID (if not specified, it'll save the file in the root direcory)
 
 # =============================================================================
 # Step Definitions
@@ -99,22 +102,22 @@ folder_id = "your_folder_id_here"       # Optional - Google Drive folder ID (if 
 
 # Navigate to URLs or mark pageviews - that's the beginning of every sequence
 [step.homepage]
-type = "visit"                      # Required - step type
-url = "https://example-shop.com"    # will load this URL
+type = 'visit'                      # Required - step type
+url = 'https://example-shop.com'    # will load this URL
 delay_after = 2                     # A delay after loading the site (optional - uses default_delay if not specified)
 
 # Only start a new step without page load (useful after clicks)
 [step.view_cart]
-type = "visit"
+type = 'visit'
 # delay_after = 2                   # still optional
 
 # Randomize visits
 [step.random_product_page]
-type = "visit"
+type = 'visit'
 url = [                            # If URLs listed in [], one of them will be randomly chosen from the list
-    "https://example-shop.com/product1", # It's useful to simplify testing similar pages (products, articles, etc.)
-    "https://example-shop.com/product2",
-    "https://example-shop.com/product3"
+    'https://example-shop.com/product1', # It's useful to simplify testing similar pages (products, articles, etc.)
+    'https://example-shop.com/product2',
+    'https://example-shop.com/product3'
 ]
 
 
@@ -122,46 +125,47 @@ url = [                            # If URLs listed in [], one of them will be r
 
 # Interact with elements via mouse clicks on a current page
 [step.accept_cookies]
-type = "click"                      # Required - step type
+type = 'click'                      # Required - step type
 clicks = [                          # List of elements to click in sequence (required at least one click)
     # Each click must have either xpath or selector (if both are available, XPath is used)
     # All clicks from the list will be executed at the given order
     { xpath = '//*[@id="cookie-accept"]' },            # Find element by XPath
-    { selector = "#button-add-to-cart" },              # Find element by CSS selector
-    { selector = "a" },                                # If more than one element matches the selector, it will be randomly picked
-    { selector = "#button-confirm", delay_after = 1 }  # you can specify delay after each click in seconds (if not, default_delay is applied)
+    { selector = '#button-add-to-cart' },              # Find element by CSS selector
+    { selector = 'a' },                                # If more than one element matches the selector, it will be randomly picked
+    { selector = '#button-confirm', delay_after = 1 }  # you can specify delay after each click in seconds (if not, default_delay is applied)
 ]                                  
 
 [step.add_to_cart]
-type = "click"
-clicks = [ { selector = "a.cart-link" } ]   # At least one click required
+type = 'click'
+clicks = [ { selector = 'a.cart-link' } ]   # At least one click required
 
 
 ###### 'form' examples
 
 # Form steps - Fill in and submit forms on a current page
 [step.login_form]
-type = "form"                       # Required
+type = 'form'                       # Required
 fields = [                          # Required for form steps
     # Each field must have:
     # - Either xpath or selector (not both)
     # - value to input
-    { selector = "#email", value = "test@example.com" },
-    { selector = "#password", value = "test123" },
-    { xpath = "//input[@name='remember']", value = "1" }
+    { selector = '#email', value = 'test@example.com' },
+    { selector = '#password', value = 'test123' },
+    { xpath = "//input[@name='remember']", value = '1' }
 ]
 submit_button = "//button[@type='submit']"    # Button to click after filling form - must be XPath (required)
+submit_method = 'selenium'                    # Submit method: "selenium" (default), "js", or "action" (optional, use only if the default doesn't work)
 delay_after = 2                               # Custom delay - optional
 
 [step.checkout_form]
-type = "form"
+type = 'form'
 fields = [                          # At least one field required
-    { selector = "#firstName", value = "John" },
-    { selector = "#lastName", value = "Doe" },
-    { selector = "#address", value = "123 Test St" },
-    { selector = "#city", value = "Test City" },
-    { selector = "#zip", value = "12345" },
-    { selector = "#phone", value = "123456789" }
+    { selector = '#firstName', value = 'John' },
+    { selector = '#lastName', value = 'Doe' },
+    { selector = '#address', value = '123 Test St' },
+    { selector = '#city', value = 'Test City' },
+    { selector = '#zip', value = '12345' },
+    { selector = '#phone', value = '123456789' }
 ]
 submit_button = "//button[contains(@class,'checkout-submit')]"
 
@@ -170,11 +174,11 @@ submit_button = "//button[contains(@class,'checkout-submit')]"
 
 # Scroll steps - Control current page scrolling
 [step.scroll_here]
-type = "scroll"                     # Required
+type = 'scroll'                     # Required
 
 # Must have exactly ONE of: selector, xpath, pixels, or percentage
-selector = ".product-list"          # Option 1: Scroll to element by CSS selector
-#xpath = "/html/body/main/div[2]"   # Option 2: Scroll to element by XPath
+selector = '.product-list'          # Option 1: Scroll to element by CSS selector
+#xpath = '/html/body/main/div[2]'   # Option 2: Scroll to element by XPath
 #pixels = 500                       # Option 3: Scroll by pixel amount (must be > 0)
 #percentage = 75                    # Option 4: Scroll to % of page (must be 0-100)
 
@@ -190,17 +194,86 @@ delay_after = 2                     # Custom delay (optional)
 
 [sequence.full_purchase]            # The name (here - "full_purchase") will be used as sheet name in the output file 
 steps = [                           # Required - list of step names to execute
-    "homepage",                     # Steps are executed in order
-    "accept_cookies",               # Each step name must match a defined [step.name]
-    "random_product_page",
-    "scroll_here",
-    "add_to_cart",
-    "checkout_form"
+    'homepage',                     # Steps are executed in order
+    'accept_cookies',               # Each step name must match a defined [step.name]
+    'random_product_page',
+    'scroll_here',
+    'add_to_cart',
+    'checkout_form'
 ]
 
 [sequence.browse_products]          # You can create as many sequences as you like
 steps = [                           # All sequences will be performed and saved to separate sheets
-    "random_product_page",                 # You can use the same step multiple times
-    "random_product_page",
-    "random_product_page"
+    'random_product_page',          # You can use the same step multiple times
+    'random_product_page',
+    'random_product_page'
 ]
+
+# =============================================================================
+# Validation
+# Optional section for dataLayer validation.
+# Each validation must have a code block with a specific structure.
+# You can define multiple validations for different events, each with a unique name.
+# If you don't need validation, you can remove this section.
+# =============================================================================
+
+#### Syntax:
+# !key1: 'value1',                # "!" means required
+# key2: 'value2',                 # optional
+# key3: /Paris|London/,           # regex pattern (inside /.../) - must match
+# key4: <type>,                   # data type: <str> for strings, <int> for integers, <float> for float numbers, <bool> for booleans (true/false)
+# 'key5': 'value5',               # quotation marks for keys are optional
+#   'key6': 'value6',             # indentation is also optional
+# key7: 'value7'                  # commas are optional as well!
+
+
+[validation]
+
+[validation.purchase]               # the name (here, "purchase") must match the event name from dataLayer
+code = '''
+  !event: 'purchase',
+  !ecommerce: {
+    !transaction_id: /\w{5,10}/,
+    !value: <float>,
+    tax: <float>,
+    shipping: <float>,
+    !currency: /USD|PLN|GBP/,
+    coupon: <str>,
+    is_new_customer: <bool>,
+    !items: [
+    {
+      !item_id: <str>,
+      !item_name: <str>,
+      affiliation: <str>,
+      coupon: <str>,
+      discount: <float>,
+      index: <int>,
+      !item_brand: <str>,
+      !item_category: <str>,
+      item_variant: <str>,
+      !price: <float>,
+      !quantity: <int>
+    }]
+  }
+'''
+
+[validation.add_to_cart]
+code = '''
+  !event: 'add_to_cart',
+  !ecommerce: {
+    !currency: /USD|PLN|GBP/,
+    !value: <float>,
+    coupon: <str>,
+    !items: [
+    {
+      !item_id: <str>,
+      !item_name: <str>,
+      !item_brand: <str>,
+      !item_category: <str>,
+      item_variant: <str>,
+      !price: <float>,
+      !quantity: <int>,
+      discount: <float>
+    }]
+  }
+'''
