@@ -491,6 +491,21 @@ class GoogleSheetsWriter:
                         }
                     }
                 },
+                # Set column width for URLs
+                 {
+                    'updateDimensionProperties': {
+                        'range': {
+                            'sheetId': sheet_id,
+                            'dimension': 'COLUMNS',
+                            'startIndex': 3,
+                            'endIndex': 4 
+                        },
+                        'properties': {
+                            'pixelSize': 200
+                        },
+                        'fields': 'pixelSize'
+                    }
+                },
                 # Set row height
                 {
                     'updateDimensionProperties': {
