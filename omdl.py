@@ -136,7 +136,7 @@ class ExcelWriter:
         # Apply text wrapping to Event Data column
         for row in sheet.iter_rows(min_row=2, min_col=5, max_col=5):
             for cell in row:
-                cell.alignment = openpyxl.styles.Alignment(wrapText=True)
+                cell.alignment = openpyxl.styles.Alignment(wrapText=False)
     
     def _write_debug_logs(self, sheet, debug_logs):
         """If enabled, write debug logs to an additional sheet"""
