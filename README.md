@@ -1,12 +1,12 @@
 # OMDL (Oh My dataLayer)
 
-**OMDL** is a script for automated collection and validation of dataLayer events from websites. It simulates user journeys and recordS selected – or all – DL events to a spreadsheet with all necessary info.
+**OMDL** is a script for automated collection and validation of dataLayer events from websites. It simulates user journeys and records selected – or all – DL events to a spreadsheet with all necessary info.
 
 If you regularly go through a website to verify dataLayer events and their content, this script can save you a lot of time. Once configured, it'll do your job in a few minutes. You'll know what, when, and where was fired to the dataLayer.
 
 The most obvious scenario is **validation of the ecommerce funnel.** With OMDL, you can simulate almost every scenario from visiting a product page to a purchase, including sign-in or filling a shipping info to a form.
 
-It can also be configured to randomly examine pages from a list or click random elements (e.g. links) on a website.
+It can also be configured to randomly examine pages from a list or click random elements (like links) on a website.
 
 OMDL stands for "Oh My dataLayer", but if you need a more official name for your boss, feel free to call it _Operational Monitoring of dataLayer_.
 
@@ -27,41 +27,33 @@ Here's a sample of what the collected data looks like:
 - 🧩 Simple validation, following your schema
 - 🖥️ Cross-platform – built with Python
 
-## Requirements
+## Usage
 
-### System Requirements
-
-- Python 3.8 or higher
-- Google Chrome browser
-- Python packages (see [Dependencies](#Dependencies))
-
-If you encounter issues with Chrome/ChromeDriver on macOS, you might need to install Command Line Tools:
-
-```bash
-xcode-select --install
-```
-
-### Dependencies
-
-To see the list, see requirements.txt file.
-
-You can download them in bulk – download the file and run the command:
-
+1. Install Google Chrome (if you haven't already)
+2. Download project files – Click "Code" ➡ "Download ZIP"
+3. Prepare your environment:
+    a. On **Windows**, [download and install Python](https://www.python.org/downloads/) or run on Windows Terminal:
+    ```winget install --id Python.Python.3.13 --source winget```
+    b. On **macOS**, verify if you already have Python installed: 
+    ```bash
+    python3 --version
+    ```
+    If not, [download and install Python](https://www.python.org/downloads/) or use Homebrew:
+    ```bash
+    brew install python
+    ```
+    To avoid issues with Chrome/ChromeDriver on macOS, you might need to install Command Line Tools:
+    ```bash
+    xcode-select --install
+    ```
+4. Install all dependencies:
 ```bash
 python3 -m pip install -r requirements.txt
 ```
-
-## Usage
-
-1. Download project files – you need at least:
-    - omdl.py 
-    - example_config.toml 
-    - requirements.txt
-2. Modify the config file (see [Configuration](#Configuration)) or create a new one
-3. Install all dependencies
-4. Run the script:
+5. Modify the config file or create a new one see [Configuration](#Configuration)
+6. Run the script:
 ```bash
-python3 omdl.py ./your-config-file.toml
+python3 /path/to/omdl.py /path/to/your-config-file.toml
 ```
 
 ## Configuration
@@ -75,8 +67,8 @@ The good news is, most of them are optional.
 OMDL uses TOML files for configuration. Each configuration file **must** include:
 
 - General configuration (`[config]` section)
-- At least one step definition (`[step]` sections)
-- At least one sequence definition (`[sequence]` section)
+- At least one definition of a step (`[step]` sections)
+- At least one definition of a sequence (`[sequence]` section)
 
 The most minimal setup would look like this:
 
@@ -101,17 +93,17 @@ For example, if OMDL can't find your Google credentials file, it will save resul
 
 ## How to design sequence steps
 
-The easiest method of creating steps for OMDL is to manually go through the website and record all selectors for clicks and forms and/or URLs for visits. 
+The easiest method of creating steps for OMDL is to manually go through the website and record all selectors for clicks and forms and URLs for visits. 
 
 To save XPath or CSS selector, you need to use developer tools in your web browser. 
-1. Right click on the element you want to click or fill, choose "Inspect".
+1. Right-click on the element you want to click or fill, choose "Inspect".
 2. You'll see your element's HTML definition highlighted. Right click on its code ⇾ Copy ⇾ CSS selector / XPath. 
 
 Usually that's enough. But sometimes crafting valid steps may be challenging, especially for clicks and forms. These tips might help:
 
 - As mentioned before, use `debug_mode` and review its warnings and errors.
 - Define longer delays to wait for elements to load/appear.
-- You may need to scroll the page before clicking the element on the bottom part of the page (e.g. due to lazy loading).
+- You may need to scroll the page before clicking the element on the bottom part of the page (e.g., due to lazy loading).
 - If a checkbox can't be toggled with "form" step, try clicking it instead. Or its label.
 - If submitting a form doesn't work, try another value of "submit_method".
 - Hide overlaying elements (like banners) with `css_elements_to_hide` setting.
