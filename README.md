@@ -32,29 +32,31 @@ Here's a sample of what the collected data looks like:
 1. Install Google Chrome (if you haven't already)
 2. Download project files – Click "Code" ➡ "Download ZIP"
 3. Prepare your environment:
-    a. On **Windows**, [download and install Python](https://www.python.org/downloads/) or run on Windows Terminal:
-    ```winget install --id Python.Python.3.13 --source winget```
-    b. On **macOS**, verify if you already have Python installed: 
-    ```bash
-    python3 --version
-    ```
-    If not, [download and install Python](https://www.python.org/downloads/) or use Homebrew:
-    ```bash
-    brew install python
-    ```
-    To avoid issues with Chrome/ChromeDriver on macOS, you might need to install Command Line Tools:
-    ```bash
-    xcode-select --install
-    ```
+    - On **Windows**, [download and install Python](https://www.python.org/downloads/) or run on Windows Terminal:
+        ```
+        winget install --id Python.Python.3.13 --source winget
+        ```
+    - On **macOS**, verify if you already have Python installed: 
+        ```bash
+        python3 --version
+        ```
+        If not, [download and install Python](https://www.python.org/downloads/) or use Homebrew:
+        ```bash
+        brew install python
+        ```
+        To avoid issues with Chrome/ChromeDriver on macOS, you might need to install Command Line Tools:
+        ```bash
+        xcode-select --install
+        ```
 4. Install all dependencies:
-```bash
-python3 -m pip install -r requirements.txt
-```
-5. Modify the config file or create a new one see [Configuration](#Configuration)
+    ```bash
+    python3 -m pip install -r requirements.txt
+    ```
+5. Modify the config file or create a new one (see [Configuration](#Configuration))
 6. Run the script:
-```bash
-python3 /path/to/omdl.py /path/to/your-config-file.toml
-```
+    ```bash
+    python3 /path/to/omdl.py /path/to/your-config-file.toml
+    ```
 
 ## Configuration
 
@@ -208,4 +210,4 @@ If you find OMDL helpful, consider [buying me a coffee.](https://buycoffee.to/ni
 
 ## License
 
-MIT License – see LICENSE file for details.
+MIT License – see [LICENSE](LICENSE) for details.
