@@ -1366,9 +1366,9 @@ def process_queued_events(event_queue, log_data, current_step, logger, until_tim
                 event['event_name'],
                 event['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
                 event['url'],
-                json.dumps(event['event_data'], indent=2) , # Added indentation for better formatting
+                json.dumps(event['event_data'], indent=2, ensure_ascii=False) , # Added indentation for better formatting and ensure_ascii=False to display non-ASCII characters
                 event['valid'],
-                json.dumps(event.get('error_details', '-'), indent=2) if event.get('error_details') else "-"
+                json.dumps(event.get('error_details', '-'), indent=2, ensure_ascii=False) if event.get('error_details') else "-"
             ])
         except Exception as e:
             logger.log(f"Error processing event from queue: {clean_error_message(e)}", "ERROR")
