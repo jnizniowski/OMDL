@@ -736,6 +736,9 @@ def parse_validation_code_block(code_str, logger):
                 break
             if not first and t == ',':
                 consume(',')
+                if peek() == '}':
+                    consume('}')
+                    break
             # key
             key = parse_value() 
             if not isinstance(key, str):
@@ -765,6 +768,10 @@ def parse_validation_code_block(code_str, logger):
         return obj
 
     def parse_array():
+        """
+        Parse a list structure from the tokenized input.
+        Returns a Python list containing the parsed elements.
+        """
         arr = []
         consume('[')
         first = True
@@ -775,6 +782,9 @@ def parse_validation_code_block(code_str, logger):
                 break
             if not first and t == ',':
                 consume(',')
+                if peek() == ']':
+                    consume(']')
+                    break
             val = parse_value()
             arr.append(val)
             first = False
@@ -1656,7 +1666,8 @@ def save_results(config, logger, log_data, debug_logs=None):
         writer = ExcelWriter(config, logger)
         return writer.save_data(log_data, debug_logs)
 
-def main():
+def main(debug_prints=False):
+    """Main execution function with optional debug printing"""
     print(PROJECT_HEADER)
 
     if len(sys.argv) < 2:
@@ -1664,7 +1675,8 @@ def main():
         sys.exit(1)
 
     config_path = sys.argv[1]
-    print(f"Starting OMDL with configuration: {config_path}")
+    if debug_prints:
+        print(f"Starting OMDL with configuration: {config_path}")
     
     logger = LogCollector()
     config = load_config(config_path, logger)
@@ -1674,12 +1686,14 @@ def main():
     log_data = {}  # Dictionary to store data for each sequence
     
     try:
-        logger.log("Initializing OMDL...", "INFO")
+        if debug_prints:
+            logger.log("Initializing OMDL...", "INFO")
         browser = initialize_browser(config, logger)
         
         # Process each sequence
         for sequence_name, sequence in config['sequence'].items():
-            logger.log(f"=== Starting sequence: {sequence_name} ===", "INFO")
+            if debug_prints:
+                logger.log(f"=== Starting sequence: {sequence_name} ===", "INFO")
             
             # Create thread communication objects for this sequence
             event_queue = Queue()
@@ -1705,11 +1719,13 @@ def main():
         # Save results
         output_path = save_results(config, logger, log_data, 
                                  logger.get_logs() if config['config'].get('debug_mode', False) else None)
-        logger.log(f"Results saved to: {output_path}", "INFO")
+        if debug_prints:
+            logger.log(f"Results saved to: {output_path}", "INFO")
             
     except Exception as e:
         error_msg = clean_error_message(e)
-        logger.log(f"Critical error: {error_msg}", "ERROR")
+        if debug_prints:
+            logger.log(f"Critical error: {error_msg}", "ERROR")
         # Create error data
         error_data = [
             ['FATAL_ERROR', 'Script Error', 
@@ -1722,15 +1738,18 @@ def main():
             # Try to save error information
             output_path = save_results(config, logger, log_data, 
                                      logger.get_logs() if config['config'].get('debug_mode', False) else None)
-            logger.log(f"Error information saved to: {output_path}")
+            if debug_prints:
+                logger.log(f"Error information saved to: {output_path}")
         except Exception as save_error:
-            print(f"Could not save error information: {clean_error_message(save_error)}")
+            if debug_prints:
+                print(f"Could not save error information: {clean_error_message(save_error)}")
             
     finally:
         if browser:
             browser.quit()
-        logger.log("\n🎉🎉🎉 Done! 🎉🎉🎉", "INFO")
+        if debug_prints:
+            logger.log("\n🎉🎉🎉 Done! 🎉🎉🎉", "INFO")
 
 # start
 if __name__ == "__main__":
-    main()
+    main(debug_prints=True)
