@@ -98,6 +98,10 @@ Field definition options:
 - `!` before parameter name means it's required (`!event_name: "view_item"`)
 - expected literal values: as in dataLayer (`quantity: 1`, `currency: "USD"`)
 - regex (full match): between two `/`; use Python regex syntax (`city: /Paris|London/`)
-- define data types: <str> for strings, <int> for integers, or <float> for numbers with decimals (`price: <float>`)
-- quotes for parameter names are optional but allowed
-- indentation is also optional but allowed
+- define data types: <str> for strings, <int> for integers, <float> for numbers with decimals or <bool> for true/false values - booleans (`price: <float>`)
+- quotes for parameter names (keys) are optional (but allowed)
+- indentation is also optional
+- commas after *key: value* pairs are optional as well
+
+
+The syntax was designed to let you copy the existing DL value (from a console or from your documentation) and to require only minimal adjustments. You don't have to bother with a proper JSON formatting.

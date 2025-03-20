@@ -221,9 +221,11 @@ steps = [                           # All sequences will be performed and saved 
 # !key1: 'value1',                # "!" means required
 # key2: 'value2',                 # optional
 # key3: /Paris|London/,           # regex pattern (inside /.../) - must match
-# key4: <type>,                 # data type (str, int, float)
-# 'key5': 'value5',               # quotes are optional but allowed
-#   'key6': 'value6',             # indentation is also optional but allowed
+# key4: <type>,                   # data type: <str> for strings, <int> for integers, <float> for float numbers, <bool> for booleans (true/false)
+# 'key5': 'value5',               # quotation marks for keys are optional
+#   'key6': 'value6',             # indentation is also optional
+# key7: 'value7'                  # commas are optional as well!
+
 
 [validation]
 
@@ -237,6 +239,7 @@ code = '''
     shipping: <float>,
     !currency: /USD|PLN|GBP/,
     coupon: <str>,
+    is_new_customer: <bool>,
     !items: [
     {
       !item_id: <str>,

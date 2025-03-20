@@ -43,7 +43,7 @@ Documentation: {PROJECT_URL}
 {'='*60}
 """
 
-allowed_validation_types = {'<int>', '<float>', '<str>'}
+allowed_validation_types = {'<int>', '<float>', '<str>', '<bool>'}
 
 ##### CLASSES
 
@@ -1581,6 +1581,7 @@ def validate_event(event: Dict[str, Any], rules: Dict[str, Any]) -> Tuple[bool, 
         "int": lambda v: isinstance(v, int) and not isinstance(v, bool),
         "float": lambda v: isinstance(v, (int, float)),
         "str": lambda v: isinstance(v, str),
+        "bool": lambda v: isinstance(v, bool),
     }
 
     

@@ -126,7 +126,7 @@ If you work with web development or web analytics, it's likely you at least have
 
 ## Validation
 
-OMDL lets you run a simple validation for events and its parameters. To add a pattern, you can simply copy the event from dataLayer or from a documentation, and declare:
+OMDL lets you run a validation for events and its parameters. To add a pattern, you can simply copy the event from dataLayer or from a documentation, and declare:
 
 - which parameters are obligatory,
 - what values (literals, regex, or value type) can be assigned.
