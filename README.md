@@ -1,4 +1,4 @@
-# OMDL (Oh My dataLayer)
+# { ! } OMDL (Oh My dataLayer)
 
 **OMDL** is a script for automated collection and validation of dataLayer events from websites. It simulates user journeys and records selected – or all – DL events to a spreadsheet with all necessary info.
 
@@ -85,6 +85,9 @@ steps = ["homepage"]
 ```
 
 **See the [Configuration reference](CONFIGURATION.md)** and  `example_config.toml` for a complete configuration reference with all available options.
+
+> [!TIP]
+> Ask ChatGPT to create a first draft of the configuration file – there is [a custom GPT](https://chatgpt.com/g/g-67e0a149283c8191947e5b4164c679a5-omdl-helper) for that purpose.
 
 Don't worry about messing up – the script will verify it and try to point out what should be fixed.
 The majority of settings have specified default values, so even if your config is incorrect, the script can use them to run your sequences anyway.
